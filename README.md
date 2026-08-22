@@ -1,0 +1,58 @@
+# 분실된 새벽
+
+새벽 2시 17분, 지도에 없는 **유실역**에서 잊어버린 사람을 다시 만나는 단편 미스터리 로맨스 비주얼 노벨입니다.
+
+## 실행
+
+- `START_GAME.cmd`를 더블 클릭하거나
+- `index.html`을 브라우저로 엽니다.
+
+설치와 인터넷 연결은 필요하지 않습니다. 진행 기록, 설정, 발견한 엔딩은 브라우저의 로컬 저장소에 보관됩니다.
+
+휴대폰 테스트용 최신 미리보기:
+
+- https://binny0114-star.github.io/lost-dawn-preview-0217/
+
+## 조작
+
+| 입력 | 기능 |
+| --- | --- |
+| 클릭 / `Enter` / `Space` | 대사 진행 |
+| `1` ~ `4` | 선택지 선택 |
+| `M` | 음소거 |
+| `Esc` | 메뉴 열기 / 닫기 |
+
+총 4개의 엔딩이 있습니다. 진 엔딩 선택지는 충분한 기억, 동조, 용기를 모으면 해금됩니다.
+
+## 구성
+
+- Canvas로 생성한 배경과 Web Audio API 기반 음향
+- 7개 표정이 전환되는 애니풍 캐릭터 스프라이트
+- 선택에 따라 달라지는 대사와 4개 엔딩
+- 자동 저장, 이어하기, 대화 기록, 텍스트 속도 조절
+- 데스크톱과 모바일 반응형 UI
+
+## 아트 크레딧
+
+캐릭터 스프라이트는 Xiael의 **Free Visual Novel Sprite - Tia**를 CC BY 조건으로 사용했습니다.
+
+- 원작자: Xiael
+- 출처: https://xiael.itch.io/tia-sprite
+- 적용: 표정 조합 선택, 파일명 변경, 게임 내 색보정·눈물 효과
+
+자세한 표기는 `assets/characters/yoonseo/LICENSE.txt`를 확인하세요.
+
+## 개발 및 자동 테스트
+
+```bash
+npm ci
+npx playwright install chromium
+npm test
+```
+
+- `npm run serve`: `http://127.0.0.1:4173`에서 로컬 실행
+- `npm test`: 데스크톱 Chromium과 Pixel 7 화면에서 핵심 진행 및 진 엔딩 테스트
+- `main` 브랜치 푸시: GitHub Actions 테스트 통과 후 휴대폰 미리보기 자동 갱신
+- Copilot 클라우드 에이전트: 의존성과 Chromium이 사전 설치된 환경에서 동작
+
+미리보기 사이트는 검색 엔진 수집을 차단하지만, URL을 아는 사람은 접속할 수 있습니다.

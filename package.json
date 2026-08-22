@@ -1,0 +1,15 @@
+{
+  "name": "lost-dawn-vn",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A short Korean mystery-romance visual novel.",
+  "scripts": {
+    "serve": "node scripts/serve.js",
+    "test": "playwright test",
+    "test:desktop": "playwright test --project=desktop-chromium",
+    "test:mobile": "playwright test --project=mobile-chromium"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.62.1"
+  }
+}

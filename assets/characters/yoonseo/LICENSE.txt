@@ -1,0 +1,18 @@
+Character sprite attribution
+============================
+
+Title: Free Visual Novel Sprite - Tia
+Creator: Xiael
+Source: https://xiael.itch.io/tia-sprite
+License: CC BY
+
+The source page permits personal and commercial use, modification, and use
+alongside original project content when Xiael is credited. The original
+character sprite must not be redistributed by itself as an edited sprite pack.
+
+Changes in this project:
+- Selected seven expression combinations from the provided PNG set
+- Renamed files for runtime emotion mapping
+- Added non-destructive runtime color grading, animation, and tear effects
+
+The game code, backgrounds, interface, and story are separate original work.
