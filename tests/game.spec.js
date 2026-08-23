@@ -4,6 +4,14 @@ const PRE_DATE_ROUTE = [0, 2, 2, 0, 0, 2, 2];
 const DATE_ROUTE = [0, 0, 0, 1, 0, 2, 2, 0, 1, 0, 0, 0, 1, 0, 2];
 const POST_DATE_ROUTE = [2, 0, 0, 2, 0, 0, 2, 1, 2, 0, 2];
 const TRUE_ROUTE_PREFIX = [...PRE_DATE_ROUTE, ...DATE_ROUTE, ...POST_DATE_ROUTE];
+const PHOTO_IDS = [
+  "cocoa-pair",
+  "photo-strip",
+  "vending-overflow",
+  "perfect-shutter",
+  "compatibility-slip",
+  "first-real-date",
+];
 
 async function playRoute(page, routePicks) {
   return page.evaluate(async (picks) => {
@@ -67,8 +75,8 @@ test.beforeEach(async ({ page }) => {
 test("title screen exposes the game and attribution", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "분실된 새벽" })).toBeVisible();
   await expect(page.locator(".title-kicker")).toContainText("SINGLE-HEROINE ROMANCE SIM");
-  await expect(page.locator('script[src="dating-sim.js?v=4"]')).toHaveCount(1);
-  await expect(page.locator('script[src="game.js?v=4"]')).toHaveCount(1);
+  await expect(page.locator('script[src="dating-sim.js?v=5"]')).toHaveCount(1);
+  await expect(page.locator('script[src="game.js?v=5"]')).toHaveCount(1);
   await expect(page.locator("#affectionHearts")).toHaveAttribute("aria-label", "윤서 호감도 0 / 10");
   await expect(page.getByRole("button", { name: /이어하기/ })).toBeDisabled();
   await expect(page.getByRole("link", { name: "XIAEL" })).toHaveAttribute(
@@ -79,6 +87,35 @@ test("title screen exposes the game and attribution", async ({ page }) => {
     "content",
     "noindex, nofollow, noarchive",
   );
+});
+
+test("all supplied album illustrations load at their source dimensions", async ({ page }) => {
+  const images = await page.evaluate(async () => {
+    const entries = Object.entries(window.LostDawnExtras.catalog.photos);
+    return Promise.all(
+      entries.map(
+        ([id, photo]) =>
+          new Promise((resolve, reject) => {
+            const image = new Image();
+            image.onload = () =>
+              resolve({
+                id,
+                src: new URL(photo.image, window.location.href).pathname,
+                width: image.naturalWidth,
+                height: image.naturalHeight,
+              });
+            image.onerror = () => reject(new Error(`Could not load ${photo.image}`));
+            image.src = photo.image;
+          }),
+      ),
+    );
+  });
+
+  expect(images.map(({ id }) => id)).toEqual(PHOTO_IDS);
+  images.forEach(({ id, src, width, height }) => {
+    expect(src).toContain(`/assets/photos/${id}.png`);
+    expect({ width, height }).toEqual({ width: 1280, height: 768 });
+  });
 });
 
 test("first branch saves progress and displays the character sprite", async ({ page }) => {
@@ -258,6 +295,8 @@ test("bonus games unlock persistent photos and achievements", async ({ page }) =
     await page.waitForTimeout(350);
   }
   await expect(page.locator(".minigame-result strong")).toHaveText("300");
+  await expect(page.locator("#photoReveal")).toHaveClass(/is-visible/);
+  await expect(page.locator("#photoReveal")).toHaveAttribute("data-photo-id", "photo-strip");
 
   let collection = await page.evaluate(() =>
     JSON.parse(window.localStorage.getItem("lost-dawn-collection-v1")),
@@ -274,6 +313,8 @@ test("bonus games unlock persistent photos and achievements", async ({ page }) =
     await page.waitForTimeout(350);
   }
   await expect(page.locator(".minigame-result")).toBeVisible();
+  await expect(page.locator("#photoReveal")).toHaveClass(/is-visible/);
+  await expect(page.locator("#photoReveal")).toHaveAttribute("data-photo-id", "perfect-shutter");
 
   collection = await page.evaluate(() =>
     JSON.parse(window.localStorage.getItem("lost-dawn-collection-v1")),
@@ -287,6 +328,107 @@ test("bonus games unlock persistent photos and achievements", async ({ page }) =
   await expect(page.locator("#collectionModal")).toHaveClass(/is-open/);
   await expect(page.locator("#photoAlbum")).toContainText("표정 네 컷");
   await expect(page.locator("#achievementList")).toContainText("표정 번역기");
+});
+
+test("album cards use the supplied illustrations", async ({ page }) => {
+  await page.evaluate((photoIds) => {
+    window.localStorage.setItem(
+      "lost-dawn-collection-v1",
+      JSON.stringify({ photos: photoIds, achievements: [] }),
+    );
+  }, PHOTO_IDS);
+  await page.getByRole("button", { name: /처음부터/ }).click();
+  await page.getByRole("button", { name: "사진 앨범과 업적" }).click();
+
+  await expect(page.locator(".photo-card.is-unlocked img")).toHaveCount(PHOTO_IDS.length);
+  for (const id of PHOTO_IDS) {
+    const image = page.locator(`.photo-card[data-photo-id="${id}"] img`);
+    await expect(image).toHaveAttribute("src", `assets/photos/${id}.png`);
+    await expect(image).not.toHaveAttribute("alt", "");
+  }
+});
+
+test("a newly unlocked story illustration fades out on the next node", async ({ page }) => {
+  await page.evaluate(() => {
+    window.sessionStorage.setItem("lost-dawn-test-preserve-save", "true");
+    window.localStorage.setItem(
+      "lost-dawn-save-v1",
+      JSON.stringify({
+        node: "breather01a",
+        chapter: "romance",
+        stats: { memory: 1, trust: 1, courage: 1, affection: 2 },
+        flags: {},
+        minigames: {},
+        history: [],
+        storyVersion: 3,
+      }),
+    );
+  });
+  await page.reload();
+  await page.getByRole("button", { name: /이어하기/ }).click();
+
+  const reveal = page.locator("#photoReveal");
+  await expect(reveal).toHaveClass(/is-visible/);
+  await expect(reveal).toHaveAttribute("data-photo-id", "cocoa-pair");
+  await expect(page.locator("#photoRevealImage")).toHaveJSProperty("naturalWidth", 1280);
+  const fit = await page.evaluate(() => ({
+    foreground: getComputedStyle(document.querySelector("#photoRevealImage")).objectFit,
+    backdrop: getComputedStyle(document.querySelector("#photoRevealBackdrop")).objectFit,
+  }));
+  expect(fit).toEqual({ foreground: "contain", backdrop: "cover" });
+
+  await page.evaluate(() => document.querySelector("#gameScreen").click());
+  await page.evaluate(() => document.querySelector("#gameScreen").click());
+  await expect(reveal).not.toHaveClass(/is-visible/);
+  await expect(page.locator("#speakerName")).toHaveText("한윤서");
+});
+
+test("a cancelled reveal frame cannot restore the previous illustration", async ({ page }) => {
+  await page.addInitScript(() => {
+    const nativeRequestAnimationFrame = window.requestAnimationFrame.bind(window);
+    let heldFrameId = 0;
+    window.__holdAnimationFrames = false;
+    window.__heldAnimationFrames = [];
+    window.requestAnimationFrame = (callback) => {
+      if (!window.__holdAnimationFrames) return nativeRequestAnimationFrame(callback);
+      window.__heldAnimationFrames.push(callback);
+      heldFrameId += 1;
+      return -heldFrameId;
+    };
+    window.__releaseAnimationFrames = () => {
+      window.__holdAnimationFrames = false;
+      const callbacks = window.__heldAnimationFrames.splice(0);
+      callbacks.forEach((callback) => callback(performance.now()));
+    };
+  });
+  await page.evaluate(() => {
+    window.sessionStorage.setItem("lost-dawn-test-preserve-save", "true");
+    window.localStorage.setItem(
+      "lost-dawn-save-v1",
+      JSON.stringify({
+        node: "breather01a",
+        chapter: "romance",
+        stats: { memory: 1, trust: 1, courage: 1, affection: 2 },
+        flags: {},
+        minigames: {},
+        history: [],
+        storyVersion: 3,
+      }),
+    );
+  });
+  await page.reload();
+  await page.evaluate(() => {
+    window.__holdAnimationFrames = true;
+  });
+  await page.getByRole("button", { name: /이어하기/ }).click();
+  await expect(page.locator("#photoRevealImage")).toHaveJSProperty("naturalWidth", 1280);
+
+  await page.evaluate(() => document.querySelector("#gameScreen").click());
+  await page.evaluate(() => document.querySelector("#gameScreen").click());
+  await page.evaluate(() => window.__releaseAnimationFrames());
+
+  await expect(page.locator("#speakerName")).toHaveText("한윤서");
+  await expect(page.locator("#photoReveal")).not.toHaveClass(/is-visible/);
 });
 
 test("restarting cancels pending minigame rewards", async ({ page }) => {
@@ -364,6 +506,7 @@ test("existing true-ending archives migrate into the collection", async ({ page 
 
   await expect(page.locator("#photoAlbum")).toContainText("오전 2시 18분 이후");
   await expect(page.locator("#achievementList")).toContainText("여섯 번째 약속");
+  await expect(page.locator("#photoReveal")).not.toHaveClass(/is-visible/);
   const collection = await page.evaluate(() =>
     JSON.parse(window.localStorage.getItem("lost-dawn-collection-v1")),
   );
@@ -421,6 +564,11 @@ test("the collection remains scrollable in short landscape", async ({ page }) =>
     expect(unlocked).toContain(ending.id);
 
     if (ending.id === "dawn") {
+      await expect(page.locator("#photoReveal")).toHaveClass(/is-visible/);
+      await expect(page.locator("#photoReveal")).toHaveAttribute(
+        "data-photo-id",
+        "first-real-date",
+      );
       const collection = await page.evaluate(() =>
         JSON.parse(window.localStorage.getItem("lost-dawn-collection-v1")),
       );

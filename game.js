@@ -13,6 +13,9 @@
     app: $("#app"),
     canvas: $("#sceneCanvas"),
     fade: $("#sceneFade"),
+    photoReveal: $("#photoReveal"),
+    photoRevealBackdrop: $("#photoRevealBackdrop"),
+    photoRevealImage: $("#photoRevealImage"),
     titleScreen: $("#titleScreen"),
     gameScreen: $("#gameScreen"),
     endingScreen: $("#endingScreen"),
@@ -800,6 +803,7 @@
   let minigameState = null;
   let minigameFrame = 0;
   let minigameTimer = 0;
+  let photoRevealRequest = 0;
 
   function createInitialState() {
     return {
@@ -1677,6 +1681,7 @@
       return;
     }
 
+    hidePhotoReveal();
     stopMinigame();
     currentNode = node;
     state.node = id;
@@ -1920,10 +1925,45 @@
     };
   }
 
+  function hidePhotoReveal() {
+    photoRevealRequest += 1;
+    elements.photoReveal.classList.remove("is-visible");
+  }
+
+  function showPhotoReveal(photoId) {
+    const photo = collectionCatalog.photos[photoId];
+    if (!photo?.image) {
+      console.error(`앨범 이미지 경로가 없습니다: ${photoId}`);
+      return;
+    }
+
+    const requestId = ++photoRevealRequest;
+    elements.photoReveal.classList.remove("is-visible");
+    elements.photoReveal.dataset.photoId = photoId;
+    elements.photoRevealBackdrop.src = photo.image;
+    elements.photoRevealImage.onload = () => {
+      if (requestId !== photoRevealRequest) return;
+      requestAnimationFrame(() => {
+        if (requestId !== photoRevealRequest) return;
+        elements.photoReveal.classList.add("is-visible");
+      });
+    };
+    elements.photoRevealImage.onerror = () => {
+      if (requestId !== photoRevealRequest) return;
+      console.error(`앨범 이미지를 불러오지 못했습니다: ${photo.image}`);
+      showToast("앨범 이미지를 불러오지 못했습니다.");
+    };
+    elements.photoRevealImage.src = photo.image;
+    if (elements.photoRevealImage.complete && elements.photoRevealImage.naturalWidth) {
+      elements.photoRevealImage.onload();
+    }
+  }
+
   function applyUnlocks(unlocks, options = {}) {
     if (!Array.isArray(unlocks) || !unlocks.length) return;
     const collection = readCollection();
     const unlockedLabels = [];
+    const unlockedPhotos = [];
 
     unlocks.forEach((unlock) => {
       const group = unlock.type === "photo" ? "photos" : "achievements";
@@ -1935,12 +1975,16 @@
       if (collection[group].includes(unlock.id)) return;
       collection[group].push(unlock.id);
       unlockedLabels.push(catalogGroup[unlock.id].title);
+      if (group === "photos") unlockedPhotos.push(unlock.id);
     });
 
     if (!unlockedLabels.length) return;
     writeStorage(COLLECTION_KEY, collection);
     updateCollectionCount();
-    if (!options.quiet) showToast(`COLLECTION · ${unlockedLabels.join(" · ")}`);
+    if (!options.quiet) {
+      if (unlockedPhotos.length) showPhotoReveal(unlockedPhotos.at(-1));
+      showToast(`COLLECTION · ${unlockedLabels.join(" · ")}`);
+    }
   }
 
   function updateCollectionCount() {
@@ -1964,14 +2008,19 @@
       const unlocked = collection.photos.includes(id);
       const card = document.createElement("article");
       card.className = `photo-card${unlocked ? " is-unlocked" : " is-locked"}`;
+      card.dataset.photoId = id;
       card.dataset.scene = photo.scene;
 
       const visual = document.createElement("div");
       visual.className = "photo-visual";
       if (unlocked) {
         const image = document.createElement("img");
-        image.src = `assets/characters/yoonseo/${photo.expression}.png`;
-        image.alt = "";
+        image.src = photo.image;
+        image.alt = photo.alt;
+        image.loading = "lazy";
+        image.decoding = "async";
+        image.width = 1280;
+        image.height = 768;
         visual.appendChild(image);
       } else {
         visual.textContent = "?";
@@ -2248,6 +2297,7 @@
     const unlocked = new Set(readStorage(ENDINGS_KEY, []));
     unlocked.add(endingId);
     writeStorage(ENDINGS_KEY, [...unlocked]);
+    hidePhotoReveal();
     if (endingId === "dawn") {
       applyUnlocks([
         { type: "photo", id: "first-real-date" },
@@ -2355,6 +2405,7 @@
     closeAllModals();
     window.cancelAnimationFrame(typingFrame);
     stopMinigame();
+    hidePhotoReveal();
     renderer.setScene("title", null, "neutral");
     transitionTo(() => {
       changeScreen("title");
