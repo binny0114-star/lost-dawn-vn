@@ -160,6 +160,8 @@ test("the schedule, date, and message loop raises persistent affection", async (
   await expect(page.locator(".choice-button")).toHaveCount(3);
 
   await page.locator(".choice-button").first().click();
+  await expect(page.locator("#toast")).toContainText("윤서와의 동조율이 올랐다");
+  await expect(page.locator("#toast")).not.toContainText("호감도");
   const messageResult = await playRoute(page, [0]);
   expect(messageResult).toEqual({ choiceIndex: 1, stoppedAtChoice: true });
   await expect(page.locator("#phonePanel")).toHaveClass(/is-visible/);
@@ -167,9 +169,11 @@ test("the schedule, date, and message loop raises persistent affection", async (
   await expect(page.locator(".phone-bubble")).toHaveCount(2);
   await expect(page.locator(".choice-button")).toHaveCount(4);
   await expect(page.locator(".choice-button.is-sticker-choice")).toHaveCount(1);
+  await expect(page.locator(".choice-button").nth(1)).toContainText("오늘 생각보다 재밌었어");
 
   await page.locator(".choice-button").first().click();
   await expect(page.locator(".phone-bubble")).toHaveCount(4);
+  await expect(page.locator(".phone-bubble").last()).toHaveText("그 말 나중에 취소하기 없기.");
   const savedState = await page.evaluate(() =>
     JSON.parse(window.localStorage.getItem("lost-dawn-save-v1")),
   );
@@ -189,6 +193,37 @@ test("the schedule, date, and message loop raises persistent affection", async (
   await playRoute(page, DATE_ROUTE.slice(3));
   await expect(page.locator("#chapterNumber")).toHaveText("CHAPTER 03");
   await expect(page.locator("#chapterName")).toHaveText("보내지 못한 여름");
+});
+
+test("affection-only replies update the accessible meter without a visual notice", async ({
+  page,
+}) => {
+  await page.evaluate(() => {
+    window.sessionStorage.setItem("lost-dawn-test-preserve-save", "true");
+    window.localStorage.setItem(
+      "lost-dawn-save-v1",
+      JSON.stringify({
+        node: "dateMessage01",
+        chapter: "romance",
+        stats: { memory: 0, trust: 0, courage: 0, affection: 0 },
+        flags: {},
+        minigames: {},
+        history: [],
+        storyVersion: 3,
+      }),
+    );
+  });
+  await page.reload();
+  await page.getByRole("button", { name: /이어하기/ }).click();
+
+  const affectionMeter = page.locator("#affectionHearts");
+  await expect(affectionMeter).toHaveAttribute("role", "status");
+  await expect(affectionMeter).toHaveAttribute("aria-live", "polite");
+  await page.locator(".choice-button.is-sticker-choice").click();
+
+  await expect(affectionMeter).toHaveAttribute("aria-label", "윤서 호감도 1 / 10");
+  await expect(page.locator("#toast")).not.toHaveClass(/is-visible/);
+  await expect(page.locator("#toast")).toBeEmpty();
 });
 
 test("bonus games unlock persistent photos and achievements", async ({ page }) => {
@@ -411,7 +446,7 @@ test("the collection remains scrollable in short landscape", async ({ page }) =>
   });
 });
 
-test("the true ending stays locked without the shared-memory choices", async ({ page }) => {
+test("locked true-ending conditions can be recovered at the final choice", async ({ page }) => {
   test.setTimeout(60_000);
   await page.getByRole("button", { name: /처음부터/ }).click();
   await expect(page.locator("#gameScreen")).toHaveClass(/is-active/);
@@ -423,11 +458,49 @@ test("the true ending stays locked without the shared-memory choices", async ({ 
     choiceIndex: TRUE_ROUTE_PREFIX.length,
     stoppedAtChoice: true,
   });
-  await expect(finalChoices).toHaveCount(4);
-  await expect(finalChoices.last()).toBeDisabled();
-  await expect(finalChoices.last()).toContainText(
-    "호감 7 · 온전한 기억 · 공동 소유 · 윤서의 동의 필요",
+  await expect(finalChoices).toHaveCount(5);
+  await expect(finalChoices.nth(3)).toBeDisabled();
+  await expect(finalChoices.nth(3)).toContainText(/호감 \d\/7/);
+  await expect(finalChoices.last()).toContainText("부족한 조건을 윤서와 다시 확인한다");
+
+  await page.keyboard.press("5");
+  await playRoute(page, []);
+  await expect(page.locator(".choice-button")).toHaveCount(4);
+
+  for (const choiceIndex of [0, 1, 2]) {
+    await page.locator(".choice-button").nth(choiceIndex).click();
+    await playRoute(page, []);
+  }
+
+  const reviewChoices = page.locator(".choice-button");
+  await expect(reviewChoices).toHaveCount(4);
+  await expect(reviewChoices.nth(0)).toBeDisabled();
+  await expect(reviewChoices.nth(1)).toBeDisabled();
+  await expect(reviewChoices.nth(2)).toBeDisabled();
+  await reviewChoices.nth(3).click();
+  await playRoute(page, []);
+
+  const recoveredChoices = page.locator(".choice-button");
+  await expect(recoveredChoices).toHaveCount(4);
+  await expect(recoveredChoices.nth(3)).toBeEnabled();
+  const recoveredState = await page.evaluate(() =>
+    JSON.parse(window.localStorage.getItem("lost-dawn-save-v1")),
   );
+  expect(recoveredState.stats).toEqual(
+    expect.objectContaining({ memory: 5, trust: 5, courage: 5, affection: 10 }),
+  );
+  expect(recoveredState.flags).toEqual(
+    expect.objectContaining({
+      accepted_whole_memory: true,
+      confirmed_joint_ownership: true,
+      named_joint_loss: true,
+      asked_consent: true,
+    }),
+  );
+
+  await recoveredChoices.nth(3).click();
+  await playRoute(page, []);
+  await expect(page.locator("#endingEyebrow")).toHaveText("TRUE END");
 });
 
 test("a qualifying save from the short edition keeps true-ending access", async ({ page }) => {
@@ -457,6 +530,33 @@ test("a qualifying save from the short edition keeps true-ending access", async 
   expect(migratedState.stats.affection).toBe(7);
   await trueEndingChoice.click();
   await expect(page.locator("#endingEyebrow")).toHaveText("TRUE END");
+});
+
+test("the survivor-guilt choice states its meaning clearly", async ({ page }) => {
+  await page.evaluate(() => {
+    window.sessionStorage.setItem("lost-dawn-test-preserve-save", "true");
+    window.localStorage.setItem(
+      "lost-dawn-save-v1",
+      JSON.stringify({
+        node: "t07",
+        chapter: "three",
+        stats: { memory: 3, trust: 3, courage: 2, affection: 5 },
+        flags: {},
+        minigames: {},
+        history: [],
+        storyVersion: 3,
+      }),
+    );
+  });
+  await page.reload();
+  await page.getByRole("button", { name: /이어하기/ }).click();
+
+  await expect(page.locator(".choice-button").first()).toContainText(
+    "네가 살려 준 삶을 죄책감으로만 보내지는 않을게",
+  );
+  await expect(page.locator(".choice-button").first()).not.toContainText(
+    "살려 줘서 미안하다고는 안 할게",
+  );
 });
 
 test("dating interfaces do not overlap on a short phone screen", async ({ page }) => {
@@ -622,4 +722,88 @@ test("final choices stay above the dialogue on a short phone screen", async ({ p
   });
 
   expect(layout.choiceBottom).toBeLessThanOrEqual(layout.dialogueTop - 8);
+});
+
+test("the final recovery choice stays above dialogue on a short-wide screen", async ({ page }) => {
+  for (const height of [540, 671]) {
+    await page.setViewportSize({ width: 1024, height });
+    await page.evaluate(() => {
+      window.sessionStorage.setItem("lost-dawn-test-preserve-save", "true");
+      window.localStorage.setItem(
+        "lost-dawn-save-v1",
+        JSON.stringify({
+          node: "f04",
+          chapter: "five",
+          stats: { memory: 0, trust: 0, courage: 0, affection: 0 },
+          flags: {},
+          minigames: {},
+          history: [],
+          storyVersion: 3,
+        }),
+      );
+    });
+    await page.reload();
+    await page.getByRole("button", { name: /이어하기/ }).click();
+
+    const recoveryChoice = page.locator(".choice-button").last();
+    await expect(page.locator(".choice-button")).toHaveCount(5);
+    await recoveryChoice.scrollIntoViewIfNeeded();
+    const layout = await page.evaluate(() => {
+      const choicePanel = document.querySelector("#choicePanel").getBoundingClientRect();
+      const recovery = document.querySelector(".choice-button:last-child").getBoundingClientRect();
+      const dialogue = document.querySelector(".dialogue-box").getBoundingClientRect();
+      return {
+        panelBottom: choicePanel.bottom,
+        recoveryTop: recovery.top,
+        recoveryBottom: recovery.bottom,
+        dialogueTop: dialogue.top,
+      };
+    });
+
+    expect(layout.panelBottom).toBeLessThanOrEqual(layout.dialogueTop - 8);
+    expect(layout.recoveryTop).toBeGreaterThanOrEqual(0);
+    expect(layout.recoveryBottom).toBeLessThanOrEqual(layout.dialogueTop - 8);
+  }
+});
+
+test("the final recovery choices stay below mobile status meters", async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 700 });
+  await page.evaluate(() => {
+    window.sessionStorage.setItem("lost-dawn-test-preserve-save", "true");
+    window.localStorage.setItem(
+      "lost-dawn-save-v1",
+      JSON.stringify({
+        node: "f04",
+        chapter: "five",
+        stats: { memory: 0, trust: 0, courage: 0, affection: 0 },
+        flags: {},
+        minigames: {},
+        history: [],
+        storyVersion: 3,
+      }),
+    );
+  });
+  await page.reload();
+  await page.getByRole("button", { name: /이어하기/ }).click();
+
+  const firstChoice = page.locator(".choice-button").first();
+  const recoveryChoice = page.locator(".choice-button").last();
+  await expect(page.locator(".choice-button")).toHaveCount(5);
+  const initialLayout = await page.evaluate(() => {
+    const status = document.querySelector(".status-cluster").getBoundingClientRect();
+    const first = document.querySelector(".choice-button").getBoundingClientRect();
+    return { statusBottom: status.bottom, firstTop: first.top };
+  });
+  expect(initialLayout.firstTop).toBeGreaterThanOrEqual(initialLayout.statusBottom + 8);
+
+  await recoveryChoice.scrollIntoViewIfNeeded();
+  const recoveryLayout = await page.evaluate(() => {
+    const recovery = document.querySelector(".choice-button:last-child").getBoundingClientRect();
+    const dialogue = document.querySelector(".dialogue-box").getBoundingClientRect();
+    return { recoveryTop: recovery.top, recoveryBottom: recovery.bottom, dialogueTop: dialogue.top };
+  });
+  expect(recoveryLayout.recoveryTop).toBeGreaterThanOrEqual(0);
+  expect(recoveryLayout.recoveryBottom).toBeLessThanOrEqual(recoveryLayout.dialogueTop - 8);
+  await recoveryChoice.click();
+  await expect(page.locator("#speakerName")).toHaveText("나");
 });

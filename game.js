@@ -586,7 +586,7 @@
       emotion: "cry",
       choices: [
         {
-          text: "“살려 줘서 미안하다고는 안 할게. 고마워, 윤서야.”",
+          text: "“네가 살려 준 삶을 죄책감으로만 보내지는 않을게. 고마워, 윤서야.”",
           next: "t08",
           effects: { trust: 1, courage: 1 },
           flag: "thanked_seo",
@@ -1820,7 +1820,10 @@
     elements.choicePanel.innerHTML = "";
     elements.choicePanel.classList.toggle("is-schedule", currentNode?.mode === "schedule");
     elements.choicePanel.classList.toggle("is-message", currentNode?.mode === "message");
-    choices.forEach((choice, index) => {
+    const visibleChoices = choices.filter(
+      (choice) => choice.visible === undefined || resolve(choice.visible),
+    );
+    visibleChoices.forEach((choice, index) => {
       const allowed = !choice.require || choice.require(state);
       const button = document.createElement("button");
       button.type = "button";
@@ -1864,7 +1867,7 @@
       } else if (!allowed) {
         const lock = document.createElement("span");
         lock.className = "choice-lock";
-        lock.textContent = `LOCKED · ${choice.lockedText || "조건 미달"}`;
+        lock.textContent = `LOCKED · ${resolve(choice.lockedText) || "조건 미달"}`;
         button.appendChild(lock);
       }
 
@@ -1904,7 +1907,6 @@
       if (delta > 0 && stat === "memory") messages.push("기억 조각이 선명해졌다");
       if (delta > 0 && stat === "trust") messages.push("윤서와의 동조율이 올랐다");
       if (delta > 0 && stat === "courage") messages.push("진실을 마주할 용기를 얻었다");
-      if (delta > 0 && stat === "affection") messages.push("윤서의 호감도가 올랐다");
       if (delta < 0 && stat === "trust") messages.push("윤서와의 거리가 멀어졌다");
     });
     if (messages.length) showToast(messages.join(" · "));
@@ -2404,7 +2406,7 @@
       return;
     }
 
-    if (activeScreen === "game" && /^[1-4]$/.test(event.key) && !typing) {
+    if (activeScreen === "game" && /^[1-5]$/.test(event.key) && !typing) {
       const button = elements.choicePanel.querySelectorAll(".choice-button")[Number(event.key) - 1];
       if (button && !button.disabled) button.click();
       return;

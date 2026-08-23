@@ -101,22 +101,22 @@
         replies: [
           {
             text: "나도 지금의 너부터 다시 좋아해 보고 싶어.",
-            response: "그 말 저장했어. 기억 돌아온 뒤에 딴소리 금지.",
+            response: "그 말 나중에 취소하기 없기.",
             effects: { affection: 1, trust: 1 },
           },
           {
-            text: "유실역의 데이트 코스, 생각보다 나쁘지 않네.",
-            response: "별점은 나가고 나서 매겨. 아직 네 번째 손님이니까.",
+            text: "오늘 생각보다 재밌었어.",
+            response: "나도. 첫날치고는 꽤 괜찮았지?",
             effects: { courage: 1 },
           },
           {
             text: "필요한 기억은 찾았으니 오늘은 이만 쉬자.",
-            response: "응. 내일은 기억 말고 사람을 만나러 와 줬으면 좋겠다.",
+            response: "응. 그런데 내일은 기억 말고 나 만나러 와 줘.",
             effects: { trust: -1 },
           },
           {
             text: "[스티커] 코코아 두 잔",
-            response: "말 대신 컵 두 개라니. 하나는 내 거라고 믿는다?",
+            response: "컵 하나는 내 거 맞지?",
             effects: { affection: 1 },
             sticker: { symbol: "☕", label: "같이 마시자" },
           },
@@ -197,13 +197,13 @@
             effects: { memory: 1 },
           },
           {
-            text: "7년치 사진을 전부 찍으면 금방 따라잡겠네.",
-            response: "사진 기사님 체력부터 확인할게. 그래도 조금 기대된다.",
+            text: "그럼 앞으로 사진 많이 찍자. 네가 변하는 것도 다 남기게.",
+            response: "좋아. 대신 이상하게 나온 것도 못 지운다.",
             effects: { courage: 1 },
           },
           {
-            text: "어떤 모습이 되든 네가 직접 고르면 옆에서 알아 갈게.",
-            response: "응. 그럼 모르는 내가 되어도 다시 소개할게. 한윤서라고.",
+            text: "어떤 모습이 되든, 그때의 너부터 다시 알아 갈게.",
+            response: "응. 처음 보는 내가 돼도 다시 인사할게. 한윤서라고.",
             effects: { affection: 1, trust: 1 },
           },
           {
@@ -280,27 +280,27 @@
         time: "02:17 + 02:24",
         incoming: [
           "아까는 좀 심하게 말했나 싶어서.",
-          "그런데 또 좋은 말만 하고 넘어가면 예전이랑 같을 것 같았어.",
+          "근데 좋은 말만 하고 넘기면 또 예전이랑 똑같을 것 같았어.",
         ],
         replies: [
           {
-            text: "괜찮아. 서로 화낼 수 있다는 것도 기억해 둘게.",
-            response: "괜찮다고 빨리 덮지는 마. 대신 기억해 둔다는 말은 마음에 들어.",
+            text: "심한 말 아니었어. 나도 제대로 들었어야 했고.",
+            response: "그럼 됐어. 대충 괜찮다고 넘기지만 말자.",
             effects: { trust: 1 },
           },
           {
-            text: "다투더라도 답장을 끊거나 다음으로 미루지 않을게.",
-            response: "약속 캡처 완료. 밖에서도 지키는지 두고 볼 거야.",
+            text: "다투더라도 답 피하지 않을게. 미루지도 않고.",
+            response: "응. 난 답 없는 게 제일 싫었어.",
             effects: { affection: 1, courage: 1 },
           },
           {
             text: "지금은 시간이 없으니까 중요한 이야기부터 하자.",
-            response: "그래. 또 우리 이야기가 덜 중요한 게 된 건 아니었으면 해.",
+            response: "알아. 그래도 우리 얘기가 또 밀리지는 않았으면 해.",
             effects: { trust: -1 },
           },
           {
-            text: "[스티커] 화해 신청서",
-            response: "신청 접수. 단, 같은 잘못 반복 시 반려합니다.",
+            text: "[스티커] 먼저 손 내밀기",
+            response: "이걸로 다 넘어가진 않을 거야. 그래도 화해는 할래.",
             effects: { affection: 1 },
             sticker: { symbol: "✓", label: "화해할래?" },
           },
@@ -371,30 +371,30 @@
       message: {
         time: "02:17 + 03:12",
         incoming: [
-          "오늘은 아무것도 해결하지 않았는데 제일 좋았어.",
-          "연애가 원래 문제를 푸는 일만은 아니었지.",
+          "오늘은 아무것도 해결 못 했는데 이상하게 제일 좋았어.",
+          "맨날 뭘 해결해야만 같이 있는 건 아니잖아.",
         ],
         replies: [
           {
-            text: "응. 네 옆에서 평범하게 시간 낭비하는 법도 다시 배울게.",
-            response: "시간 낭비 예약 완료. 일단 하루 종일 아무것도 안 하기부터.",
+            text: "밖에 나가서도 가끔 이렇게 아무것도 하지 말자.",
+            response: "좋아. 옆에만 있어도 되는 날로.",
             effects: { affection: 1, trust: 1 },
           },
           {
             text: "그래도 역에서 나갈 방법은 계속 생각해야 해.",
-            response: "알아. 잠깐 평범해도 된다는 말이었어. 같이 방법 찾자.",
+            response: "알아. 잠깐 쉬었다가 같이 찾자.",
             effects: { courage: 1 },
           },
           {
-            text: "밖에서는 바쁠 테니 이런 시간은 자주 못 만들 수도 있어.",
-            response: "아직 나가지도 않았는데 벌써 다음으로 미루는구나.",
+            text: "밖에 나가면 바쁠 텐데 이런 날이 자주 있을까.",
+            response: "벌써부터 못 할 이유부터 찾네.",
             effects: { trust: -1 },
           },
           {
-            text: "[스티커] 아무것도 안 하는 중",
-            response: "좋아. 이 스티커처럼 나란히 늘어져 있는 날도 예약.",
+            text: "[스티커] 같이 멍때리기",
+            response: "좋다. 나중에 진짜 옆에서 이러고 있자.",
             effects: { affection: 1 },
-            sticker: { symbol: "…", label: "같이 쉬자" },
+            sticker: { symbol: "…", label: "같이 멍때리자" },
           },
         ],
       },
@@ -463,30 +463,30 @@
       message: {
         time: "02:17 + 04:00",
         incoming: [
-          "다섯 번이나 만나고도 물어보는 게 좀 웃기지만.",
-          "기억이 다 돌아오지 않아도, 지금의 나는 어때?",
+          "다섯 번이나 만나고 이런 걸 묻는 것도 좀 웃긴데.",
+          "기억이 다 안 돌아와도, 지금의 나는 어때?",
         ],
         replies: [
           {
             text: "기억 속 너와 닮아서 안심돼.",
-            response: "닮은 건 맞지만 같은 사람으로만 보지는 말아 줘.",
+            response: "닮았어도 지금의 나는 따로 봐 줬으면 좋겠어.",
             effects: { memory: 1 },
           },
           {
-            text: "아직 모르는 게 많아서 더 알아보고 싶어.",
-            response: "나쁘지 않은 대답. 그런데 조금 더 솔직해도 되는데.",
+            text: "아직 모르는 게 많아서, 더 알고 싶어.",
+            response: "그럼 나도 더 보여 줄게. 너도 숨기지 말고.",
             effects: { trust: 1 },
           },
           {
             text: "좋아해. 기억이 돌아와서가 아니라 지금의 너를.",
-            response: "……응. 그 답이면 밖에서도 다시 만나 줄게.",
+            response: "……나도. 밖에 나가서 다시 만나자.",
             effects: { affection: 1, courage: 1 },
           },
           {
-            text: "[스티커] 다음 약속 확정",
-            response: "스티커로 고백을 피했네. 그래도 약속은 확정이야.",
+            text: "[스티커] 다음에도 만나자",
+            response: "말로 해 주면 더 좋았을 텐데. 그래도 다음 약속은 잡은 거다?",
             effects: { affection: 1 },
-            sticker: { symbol: "♥", label: "NEXT DATE" },
+            sticker: { symbol: "♥", label: "다음에도 만나자" },
           },
         ],
       },
@@ -700,10 +700,112 @@
 
     const trueEndingChoice = story.f04.choices[3];
     const storyRequirement = trueEndingChoice.require;
-    trueEndingChoice.require = (state) =>
+    const hasWholeMemory = (state) =>
+      state.stats.memory >= 4 && state.flags.accepted_whole_memory;
+    const hasJointOwnership = (state) =>
+      state.stats.trust >= 4 &&
+      state.stats.courage >= 3 &&
+      (state.flags.read_perforation ||
+        state.flags.confirmed_joint_ownership ||
+        state.flags.read_return_wording) &&
+      (state.flags.named_joint_loss || state.flags.saw_shared_ticket);
+    const hasMutualConsent = (state) =>
+      state.stats.affection >= 7 && state.flags.asked_consent;
+    const getMissingRequirements = (state) => {
+      if (state.flags.legacy_true_ending_eligible) return [];
+      const missing = [];
+      if (!hasMutualConsent(state)) {
+        missing.push(
+          state.stats.affection >= 7 ? "윤서의 동의" : `호감 ${state.stats.affection}/7`,
+        );
+      }
+      if (!hasWholeMemory(state)) missing.push("온전한 기억");
+      if (!hasJointOwnership(state)) missing.push("공동 소유");
+      return missing;
+    };
+    const trueEndingRequirement = (state) =>
       storyRequirement(state) &&
       (state.flags.legacy_true_ending_eligible || state.stats.affection >= 7);
-    trueEndingChoice.lockedText = "호감 7 · 온전한 기억 · 공동 소유 · 윤서의 동의 필요";
+    trueEndingChoice.require = trueEndingRequirement;
+    trueEndingChoice.lockedText = (state) => getMissingRequirements(state).join(" · ");
+
+    Object.assign(story, {
+      trueEndingReview: line(
+        "office",
+        "seo",
+        "나",
+        (state) => {
+          const missing = getMissingRequirements(state);
+          return missing.length
+            ? `개찰기가 멈춘 이유가 표면에 떠올랐다. 아직 확인하지 못한 조건은 ${missing.join(", ")}. 열차가 떠나기 전, 윤서와 하나씩 다시 결정할 수 있다.`
+            : "파란 표의 두 이름과 우리의 선택이 모두 맞물렸다. 이제 마지막 승강장으로 돌아가면 함께 나가는 길을 고를 수 있다.";
+        },
+        null,
+        {
+          emotion: "soft",
+          choices: [
+            {
+              text: "좋은 기억과 아픈 기억을 나누지 않고 전부 받아들인다.",
+              next: "trueEndingReviewMemory",
+              require: (state) => !hasWholeMemory(state),
+              lockedText: "확인 완료",
+              effects: { memory: 5 },
+              flags: ["accepted_whole_memory"],
+            },
+            {
+              text: "한 장의 표와 한 번의 귀환이 두 사람의 공동 소유임을 확인한다.",
+              next: "trueEndingReviewOwnership",
+              require: (state) => !hasJointOwnership(state),
+              lockedText: "확인 완료",
+              effects: { trust: 5, courage: 5 },
+              flags: ["confirmed_joint_ownership", "named_joint_loss"],
+            },
+            {
+              text: "윤서에게 지금의 마음을 고백하고 함께 돌아갈지 다시 묻는다.",
+              next: "trueEndingReviewConsent",
+              require: (state) => !hasMutualConsent(state),
+              lockedText: "확인 완료",
+              effects: { affection: 10 },
+              flags: ["asked_consent"],
+            },
+            {
+              text: "확인을 마치고 최종 승강장으로 돌아간다.",
+              next: "f04",
+            },
+          ],
+        },
+      ),
+      trueEndingReviewMemory: line(
+        "memory",
+        "seo",
+        "나",
+        "행복했던 순간만 남기면 윤서의 선택과 우리가 견딘 시간도 사라진다. 나는 편한 반쪽 대신, 아픈 날까지 이어진 우리 전부를 기억하기로 했다.",
+        "trueEndingReview",
+        { emotion: "soft" },
+      ),
+      trueEndingReviewOwnership: line(
+        "office",
+        "seo",
+        "나",
+        "절취선은 표를 두 장으로 만드는 선이 아니었다. 서로의 이름이 적힌 두 반쪽이 모여야 한 번의 귀환이 완성된다. 잃어버린 7년도, 돌아갈 자리도 우리 둘의 것이었다.",
+        "trueEndingReview",
+        { emotion: "surprised" },
+      ),
+      trueEndingReviewConsent: line(
+        "dawn",
+        "seo",
+        "한윤서",
+        "“응. 기억 속의 내가 아니라 지금의 나한테 물어봐 줘서 고마워. 나도 너랑 같이 나갈래.” 윤서는 내 손이 아니라 표의 반대쪽을 스스로 잡았다.",
+        "trueEndingReview",
+        { emotion: "smile" },
+      ),
+    });
+
+    story.f04.choices.push({
+      text: "잠시 멈추고 부족한 조건을 윤서와 다시 확인한다.",
+      next: "trueEndingReview",
+      visible: (state) => !trueEndingRequirement(state),
+    });
   }
 
   window.LostDawnDatingSim = { apply };
