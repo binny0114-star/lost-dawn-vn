@@ -75,8 +75,8 @@ test.beforeEach(async ({ page }) => {
 test("title screen exposes the game and attribution", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "분실된 새벽" })).toBeVisible();
   await expect(page.locator(".title-kicker")).toContainText("SINGLE-HEROINE ROMANCE SIM");
-  await expect(page.locator('script[src="dating-sim.js?v=5"]')).toHaveCount(1);
-  await expect(page.locator('script[src="game.js?v=5"]')).toHaveCount(1);
+  await expect(page.locator('script[src="dating-sim.js?v=6"]')).toHaveCount(1);
+  await expect(page.locator('script[src="game.js?v=6"]')).toHaveCount(1);
   await expect(page.locator("#affectionHearts")).toHaveAttribute("aria-label", "윤서 호감도 0 / 10");
   await expect(page.getByRole("button", { name: /이어하기/ })).toBeDisabled();
   await expect(page.getByRole("link", { name: "XIAEL" })).toHaveAttribute(
@@ -381,6 +381,41 @@ test("a newly unlocked story illustration fades out on the next node", async ({ 
   await page.evaluate(() => document.querySelector("#gameScreen").click());
   await expect(reveal).not.toHaveClass(/is-visible/);
   await expect(page.locator("#speakerName")).toHaveText("한윤서");
+});
+
+test("previously unlocked artwork still appears at its story moment", async ({ page }) => {
+  await page.evaluate(() => {
+    window.sessionStorage.setItem("lost-dawn-test-preserve-save", "true");
+    window.localStorage.setItem(
+      "lost-dawn-save-v1",
+      JSON.stringify({
+        node: "breather01a",
+        chapter: "romance",
+        stats: { memory: 1, trust: 1, courage: 1, affection: 2 },
+        flags: {},
+        minigames: {},
+        history: [],
+        storyVersion: 3,
+      }),
+    );
+    window.localStorage.setItem(
+      "lost-dawn-collection-v1",
+      JSON.stringify({
+        photos: ["cocoa-pair"],
+        achievements: ["first-breather"],
+      }),
+    );
+  });
+  await page.reload();
+  await page.getByRole("button", { name: /이어하기/ }).click();
+
+  await expect(page.locator("#photoReveal")).toHaveClass(/is-visible/);
+  await expect(page.locator("#photoReveal")).toHaveAttribute("data-photo-id", "cocoa-pair");
+  const collection = await page.evaluate(() =>
+    JSON.parse(window.localStorage.getItem("lost-dawn-collection-v1")),
+  );
+  expect(collection.photos).toEqual(["cocoa-pair"]);
+  expect(collection.achievements).toEqual(["first-breather"]);
 });
 
 test("a cancelled reveal frame cannot restore the previous illustration", async ({ page }) => {

@@ -1963,7 +1963,7 @@
     if (!Array.isArray(unlocks) || !unlocks.length) return;
     const collection = readCollection();
     const unlockedLabels = [];
-    const unlockedPhotos = [];
+    const photosToReveal = [];
 
     unlocks.forEach((unlock) => {
       const group = unlock.type === "photo" ? "photos" : "achievements";
@@ -1972,18 +1972,19 @@
         console.error(`존재하지 않는 수집 항목: ${unlock.type}:${unlock.id}`);
         return;
       }
+      if (group === "photos") photosToReveal.push(unlock.id);
       if (collection[group].includes(unlock.id)) return;
       collection[group].push(unlock.id);
       unlockedLabels.push(catalogGroup[unlock.id].title);
-      if (group === "photos") unlockedPhotos.push(unlock.id);
     });
 
-    if (!unlockedLabels.length) return;
-    writeStorage(COLLECTION_KEY, collection);
-    updateCollectionCount();
+    if (unlockedLabels.length) {
+      writeStorage(COLLECTION_KEY, collection);
+      updateCollectionCount();
+    }
     if (!options.quiet) {
-      if (unlockedPhotos.length) showPhotoReveal(unlockedPhotos.at(-1));
-      showToast(`COLLECTION · ${unlockedLabels.join(" · ")}`);
+      if (photosToReveal.length) showPhotoReveal(photosToReveal.at(-1));
+      if (unlockedLabels.length) showToast(`COLLECTION · ${unlockedLabels.join(" · ")}`);
     }
   }
 
