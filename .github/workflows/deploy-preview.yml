@@ -42,7 +42,7 @@ jobs:
         run: |
           git clone "git@github.com:${PREVIEW_REPOSITORY}.git" /tmp/lost-dawn-preview
           find /tmp/lost-dawn-preview -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
-          cp index.html styles.css story-expansion.js dating-sim.js game.js robots.txt .nojekyll /tmp/lost-dawn-preview/
+          cp index.html styles.css story-expansion.js dating-sim.js romance-extras.js game.js robots.txt .nojekyll /tmp/lost-dawn-preview/
           cp -R assets /tmp/lost-dawn-preview/
           cd /tmp/lost-dawn-preview
           git config user.name "Lost Dawn Preview Bot"

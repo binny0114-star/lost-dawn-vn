@@ -16,6 +16,20 @@ async function playRoute(page, routePicks) {
         return { choiceIndex };
       }
 
+      const minigame = document.querySelector("#minigamePanel.is-visible");
+      if (minigame) {
+        const action =
+          minigame.querySelector(
+            ".minigame-action[data-minigame-best='true']:not(:disabled)",
+          ) ||
+          minigame.querySelector(
+            ".minigame-action[data-minigame-primary='true']:not(:disabled)",
+          );
+        if (action) action.click();
+        await sleep(12);
+        continue;
+      }
+
       const choices = [...document.querySelectorAll(".choice-button")];
       if (choices.length) {
         if (choiceIndex >= picks.length) {
@@ -151,6 +165,8 @@ test("the schedule, date, and message loop raises persistent affection", async (
   await expect(page.locator("#phonePanel")).toHaveClass(/is-visible/);
   await expect(page.locator("#choicePanel")).toHaveClass(/is-message/);
   await expect(page.locator(".phone-bubble")).toHaveCount(2);
+  await expect(page.locator(".choice-button")).toHaveCount(4);
+  await expect(page.locator(".choice-button.is-sticker-choice")).toHaveCount(1);
 
   await page.locator(".choice-button").first().click();
   await expect(page.locator(".phone-bubble")).toHaveCount(4);
@@ -162,7 +178,8 @@ test("the schedule, date, and message loop raises persistent affection", async (
   expect(savedState.flags.date_reply_1_0).toBe(true);
 
   await page.waitForTimeout(400);
-  await page.keyboard.press("Enter");
+  const nextSchedule = await playRoute(page, []);
+  expect(nextSchedule).toEqual({ choiceIndex: 0, stoppedAtChoice: true });
   await expect(page.locator("#schedulePhase")).toHaveText("MEMORY DATE 02 / 05");
   const advancedState = await page.evaluate(() =>
     JSON.parse(window.localStorage.getItem("lost-dawn-save-v1")),
@@ -172,6 +189,172 @@ test("the schedule, date, and message loop raises persistent affection", async (
   await playRoute(page, DATE_ROUTE.slice(3));
   await expect(page.locator("#chapterNumber")).toHaveText("CHAPTER 03");
   await expect(page.locator("#chapterName")).toHaveText("보내지 못한 여름");
+});
+
+test("bonus games unlock persistent photos and achievements", async ({ page }) => {
+  const seedBonusGame = async (node) => {
+    await page.evaluate((savedNode) => {
+      window.sessionStorage.setItem("lost-dawn-test-preserve-save", "true");
+      window.localStorage.setItem(
+        "lost-dawn-save-v1",
+        JSON.stringify({
+          node: savedNode,
+          chapter: "romance",
+          stats: { memory: 2, trust: 2, courage: 2, affection: 2 },
+          flags: {},
+          minigames: {},
+          history: [],
+          storyVersion: 3,
+        }),
+      );
+    }, node);
+    await page.reload();
+    await page.getByRole("button", { name: /이어하기/ }).click();
+    await expect(page.locator("#minigamePanel")).toHaveClass(/is-visible/);
+  };
+
+  await seedBonusGame("bonusExpressionGame");
+  await expect(page.locator("#minigameTitle")).toHaveText("윤서 표정 맞히기");
+  for (let round = 0; round < 3; round += 1) {
+    await page.locator(".minigame-action[data-minigame-best='true']").click();
+    await page.waitForTimeout(350);
+  }
+  await expect(page.locator(".minigame-result strong")).toHaveText("300");
+
+  let collection = await page.evaluate(() =>
+    JSON.parse(window.localStorage.getItem("lost-dawn-collection-v1")),
+  );
+  expect(collection.photos).toContain("photo-strip");
+  expect(collection.achievements).toEqual(
+    expect.arrayContaining(["expression-clear", "expression-master"]),
+  );
+
+  await seedBonusGame("bonusShutterGame");
+  await expect(page.locator("#minigameTitle")).toHaveText("막차 셔터");
+  for (let round = 0; round < 3; round += 1) {
+    await page.locator(".minigame-action[data-minigame-primary='true']").click();
+    await page.waitForTimeout(350);
+  }
+  await expect(page.locator(".minigame-result")).toBeVisible();
+
+  collection = await page.evaluate(() =>
+    JSON.parse(window.localStorage.getItem("lost-dawn-collection-v1")),
+  );
+  expect(collection.photos).toEqual(expect.arrayContaining(["photo-strip", "perfect-shutter"]));
+  expect(collection.achievements).toEqual(
+    expect.arrayContaining(["expression-clear", "shutter-clear"]),
+  );
+
+  await page.getByRole("button", { name: "사진 앨범과 업적" }).click();
+  await expect(page.locator("#collectionModal")).toHaveClass(/is-open/);
+  await expect(page.locator("#photoAlbum")).toContainText("표정 네 컷");
+  await expect(page.locator("#achievementList")).toContainText("표정 번역기");
+});
+
+test("restarting cancels pending minigame rewards", async ({ page }) => {
+  await page.evaluate(() => {
+    window.sessionStorage.setItem("lost-dawn-test-preserve-save", "true");
+    window.localStorage.setItem(
+      "lost-dawn-save-v1",
+      JSON.stringify({
+        node: "bonusExpressionGame",
+        chapter: "romance",
+        stats: { memory: 0, trust: 0, courage: 0, affection: 0 },
+        flags: {},
+        minigames: {},
+        history: [],
+        storyVersion: 3,
+      }),
+    );
+  });
+  await page.reload();
+  await page.getByRole("button", { name: /이어하기/ }).click();
+
+  for (let round = 0; round < 2; round += 1) {
+    await page.locator(".minigame-action[data-minigame-best='true']").click();
+    await page.waitForTimeout(350);
+  }
+  await page.locator(".minigame-action[data-minigame-best='true']").click();
+  await page.evaluate(() => document.querySelector('[data-action="restart"]').click());
+  await page.waitForTimeout(750);
+
+  const savedState = await page.evaluate(() =>
+    JSON.parse(window.localStorage.getItem("lost-dawn-save-v1")),
+  );
+  expect(savedState.node).toBe("p01");
+  expect(savedState.stats.affection).toBe(0);
+  expect(savedState.minigames).toEqual({});
+});
+
+test("held keys do not auto-complete minigame rounds", async ({ page }) => {
+  await page.evaluate(() => {
+    window.sessionStorage.setItem("lost-dawn-test-preserve-save", "true");
+    window.localStorage.setItem(
+      "lost-dawn-save-v1",
+      JSON.stringify({
+        node: "bonusExpressionGame",
+        chapter: "romance",
+        stats: { memory: 0, trust: 0, courage: 0, affection: 0 },
+        flags: {},
+        minigames: {},
+        history: [],
+        storyVersion: 3,
+      }),
+    );
+  });
+  await page.reload();
+  await page.getByRole("button", { name: /이어하기/ }).click();
+
+  await page.evaluate(() => {
+    document.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "2", repeat: true, bubbles: true }),
+    );
+  });
+  await page.waitForTimeout(400);
+  await expect(page.locator("#minigameRound")).toHaveText("ROUND 1 / 3");
+  await expect(page.locator(".minigame-action:not(:disabled)")).toHaveCount(3);
+});
+
+test("existing true-ending archives migrate into the collection", async ({ page }) => {
+  await page.evaluate(() => {
+    window.sessionStorage.setItem("lost-dawn-test-preserve-save", "true");
+    window.localStorage.setItem("lost-dawn-endings-v1", JSON.stringify(["dawn"]));
+  });
+  await page.reload();
+  await page.getByRole("button", { name: /처음부터/ }).click();
+  await page.getByRole("button", { name: "사진 앨범과 업적" }).click();
+
+  await expect(page.locator("#photoAlbum")).toContainText("오전 2시 18분 이후");
+  await expect(page.locator("#achievementList")).toContainText("여섯 번째 약속");
+  const collection = await page.evaluate(() =>
+    JSON.parse(window.localStorage.getItem("lost-dawn-collection-v1")),
+  );
+  expect(collection.photos).toContain("first-real-date");
+  expect(collection.achievements).toContain("true-dawn");
+});
+
+test("the collection remains scrollable in short landscape", async ({ page }) => {
+  await page.setViewportSize({ width: 480, height: 320 });
+  await page.getByRole("button", { name: /처음부터/ }).click();
+  await page.getByRole("button", { name: "사진 앨범과 업적" }).click();
+  const lastAchievement = page.locator(".achievement-item").last();
+  await lastAchievement.scrollIntoViewIfNeeded();
+
+  const layout = await page.evaluate(() => {
+    const panel = document.querySelector(".collection-panel").getBoundingClientRect();
+    const last = document.querySelector(".achievement-item:last-child").getBoundingClientRect();
+    return {
+      panelTop: panel.top,
+      panelBottom: panel.bottom,
+      itemTop: last.top,
+      itemBottom: last.bottom,
+      viewportHeight: window.innerHeight,
+    };
+  });
+  expect(layout.panelTop).toBeGreaterThanOrEqual(0);
+  expect(layout.panelBottom).toBeLessThanOrEqual(layout.viewportHeight);
+  expect(layout.itemTop).toBeGreaterThanOrEqual(layout.panelTop);
+  expect(layout.itemBottom).toBeLessThanOrEqual(layout.panelBottom);
 });
 
 [
@@ -198,6 +381,33 @@ test("the schedule, date, and message loop raises persistent affection", async (
       JSON.parse(window.localStorage.getItem("lost-dawn-endings-v1")),
     );
     expect(unlocked).toContain(ending.id);
+
+    if (ending.id === "dawn") {
+      const collection = await page.evaluate(() =>
+        JSON.parse(window.localStorage.getItem("lost-dawn-collection-v1")),
+      );
+      expect(collection.photos).toEqual(
+        expect.arrayContaining([
+          "cocoa-pair",
+          "photo-strip",
+          "vending-overflow",
+          "perfect-shutter",
+          "compatibility-slip",
+          "first-real-date",
+        ]),
+      );
+      expect(collection.achievements).toEqual(
+        expect.arrayContaining([
+          "first-breather",
+          "expression-clear",
+          "snack-party",
+          "shutter-clear",
+          "five-date-clear",
+          "affection-seven",
+          "true-dawn",
+        ]),
+      );
+    }
   });
 });
 
@@ -306,6 +516,7 @@ test("dating choices remain scroll-reachable at compact breakpoint edges", async
   test.setTimeout(60_000);
 
   for (const viewport of [
+    { width: 1024, height: 601 },
     { width: 761, height: 540 },
     { width: 480, height: 320 },
   ]) {

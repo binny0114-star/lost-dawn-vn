@@ -4,6 +4,7 @@
   const SAVE_KEY = "lost-dawn-save-v1";
   const SETTINGS_KEY = "lost-dawn-settings-v1";
   const ENDINGS_KEY = "lost-dawn-endings-v1";
+  const COLLECTION_KEY = "lost-dawn-collection-v1";
   const STORY_VERSION = 3;
   const ENDING_ORDER = ["memory", "oblivion", "keeper", "dawn"];
 
@@ -37,6 +38,13 @@
     phoneTime: $("#phoneTime"),
     phoneMessages: $("#phoneMessages"),
     phoneHint: $("#phoneHint"),
+    minigamePanel: $("#minigamePanel"),
+    minigameTitle: $("#minigameTitle"),
+    minigameRound: $("#minigameRound"),
+    minigameSubtitle: $("#minigameSubtitle"),
+    minigameStage: $("#minigameStage"),
+    minigameFeedback: $("#minigameFeedback"),
+    minigameControls: $("#minigameControls"),
     speakerName: $("#speakerName"),
     speakerEn: $("#speakerEn"),
     dialogueText: $("#dialogueText"),
@@ -44,6 +52,12 @@
     choicePanel: $("#choicePanel"),
     logModal: $("#logModal"),
     logContent: $("#logContent"),
+    collectionModal: $("#collectionModal"),
+    collectionCount: $("#collectionCount"),
+    photoCount: $("#photoCount"),
+    photoAlbum: $("#photoAlbum"),
+    achievementCount: $("#achievementCount"),
+    achievementList: $("#achievementList"),
     settingsModal: $("#settingsModal"),
     pauseModal: $("#pauseModal"),
     confirmModal: $("#confirmModal"),
@@ -759,6 +773,11 @@
     throw new Error("연애 시뮬레이션 모듈을 불러오지 못했습니다.");
   }
   window.LostDawnDatingSim.apply(STORY, chapters, endings, line);
+  if (!window.LostDawnExtras) {
+    throw new Error("보너스 콘텐츠 모듈을 불러오지 못했습니다.");
+  }
+  window.LostDawnExtras.apply(STORY, line);
+  const collectionCatalog = window.LostDawnExtras.catalog;
 
   const defaultSettings = {
     textSpeed: 24,
@@ -778,6 +797,9 @@
   let transitioning = false;
   let toastTimer = 0;
   let advanceBlockedUntil = 0;
+  let minigameState = null;
+  let minigameFrame = 0;
+  let minigameTimer = 0;
 
   function createInitialState() {
     return {
@@ -785,6 +807,7 @@
       chapter: "",
       stats: { memory: 0, trust: 0, courage: 0, affection: 0 },
       flags: {},
+      minigames: {},
       history: [],
       startedAt: Date.now(),
       storyVersion: STORY_VERSION,
@@ -796,6 +819,7 @@
       ...saved,
       stats: { ...(saved.stats || {}) },
       flags: { ...(saved.flags || {}) },
+      minigames: { ...(saved.minigames || {}) },
       storyVersion: STORY_VERSION,
     };
     const stats = migrated.stats;
@@ -1603,6 +1627,7 @@
 
   function startNewGame() {
     closeAllModals();
+    stopMinigame();
     state = createInitialState();
     audio.start();
     transitionTo(() => {
@@ -1634,6 +1659,7 @@
       ...migrated,
       stats: { ...initialState.stats, ...migrated.stats },
       flags: migrated.flags,
+      minigames: migrated.minigames,
       history: Array.isArray(migrated.history) ? migrated.history : [],
     };
     audio.start();
@@ -1651,6 +1677,7 @@
       return;
     }
 
+    stopMinigame();
     currentNode = node;
     state.node = id;
     fullText = String(resolve(node.text));
@@ -1676,8 +1703,10 @@
       state.history = state.history.slice(-220);
     }
 
+    if (node.unlocks) applyUnlocks(resolve(node.unlocks));
     updateStatusUI();
-    if (node.mode === "message" || node.mode === "schedule") completeTyping();
+    if (node.mode === "minigame") startMinigame(node.minigame);
+    else if (node.mode === "message" || node.mode === "schedule") completeTyping();
     else beginTyping();
     saveGame();
   }
@@ -1698,10 +1727,13 @@
   function updateStoryModeUI(node) {
     const scheduleVisible = node.mode === "schedule" && node.schedule;
     const phoneVisible = node.mode === "message" && node.phone;
+    const minigameVisible = node.mode === "minigame" && node.minigame;
     elements.schedulePanel.classList.toggle("is-visible", Boolean(scheduleVisible));
     elements.schedulePanel.setAttribute("aria-hidden", String(!scheduleVisible));
     elements.phonePanel.classList.toggle("is-visible", Boolean(phoneVisible));
     elements.phonePanel.setAttribute("aria-hidden", String(!phoneVisible));
+    elements.minigamePanel.classList.toggle("is-visible", Boolean(minigameVisible));
+    elements.minigamePanel.setAttribute("aria-hidden", String(!minigameVisible));
 
     if (scheduleVisible) {
       elements.schedulePhase.textContent = `MEMORY DATE ${String(node.schedule.day).padStart(2, "0")} / ${String(node.schedule.total).padStart(2, "0")}`;
@@ -1767,6 +1799,7 @@
 
   function advanceStory() {
     if (activeScreen !== "game" || anyModalOpen() || transitioning) return;
+    if (minigameState) return;
     if (performance.now() < advanceBlockedUntil) return;
     if (typing) {
       completeTyping();
@@ -1809,6 +1842,15 @@
         name.textContent = choice.activity.name;
         description.textContent = choice.activity.description;
         copy.append(code, name, description);
+      } else if (choice.sticker) {
+        button.classList.add("is-sticker-choice");
+        const symbol = document.createElement("strong");
+        const label = document.createElement("span");
+        symbol.className = "choice-sticker-symbol";
+        label.className = "choice-sticker-label";
+        symbol.textContent = choice.sticker.symbol;
+        label.textContent = choice.sticker.label;
+        copy.append(symbol, label);
       } else {
         copy.textContent = choice.text;
       }
@@ -1846,6 +1888,7 @@
         state.flags[flag] = true;
       });
     }
+    if (choice.unlocks) applyUnlocks(resolve(choice.unlocks));
     audio.start();
     audio.chime("choice");
     if (blockRapidAdvance) advanceBlockedUntil = performance.now() + 350;
@@ -1865,6 +1908,287 @@
       if (delta < 0 && stat === "trust") messages.push("윤서와의 거리가 멀어졌다");
     });
     if (messages.length) showToast(messages.join(" · "));
+  }
+
+  function readCollection() {
+    const stored = readStorage(COLLECTION_KEY, {});
+    return {
+      photos: Array.isArray(stored.photos) ? stored.photos : [],
+      achievements: Array.isArray(stored.achievements) ? stored.achievements : [],
+    };
+  }
+
+  function applyUnlocks(unlocks, options = {}) {
+    if (!Array.isArray(unlocks) || !unlocks.length) return;
+    const collection = readCollection();
+    const unlockedLabels = [];
+
+    unlocks.forEach((unlock) => {
+      const group = unlock.type === "photo" ? "photos" : "achievements";
+      const catalogGroup = collectionCatalog[group];
+      if (!catalogGroup?.[unlock.id]) {
+        console.error(`존재하지 않는 수집 항목: ${unlock.type}:${unlock.id}`);
+        return;
+      }
+      if (collection[group].includes(unlock.id)) return;
+      collection[group].push(unlock.id);
+      unlockedLabels.push(catalogGroup[unlock.id].title);
+    });
+
+    if (!unlockedLabels.length) return;
+    writeStorage(COLLECTION_KEY, collection);
+    updateCollectionCount();
+    if (!options.quiet) showToast(`COLLECTION · ${unlockedLabels.join(" · ")}`);
+  }
+
+  function updateCollectionCount() {
+    const collection = readCollection();
+    elements.collectionCount.textContent = String(
+      collection.photos.length + collection.achievements.length,
+    );
+  }
+
+  function renderCollection() {
+    const collection = readCollection();
+    const photos = Object.entries(collectionCatalog.photos);
+    const achievements = Object.entries(collectionCatalog.achievements);
+    elements.photoCount.textContent = `${collection.photos.length} / ${photos.length}`;
+    elements.achievementCount.textContent =
+      `${collection.achievements.length} / ${achievements.length}`;
+    elements.photoAlbum.innerHTML = "";
+    elements.achievementList.innerHTML = "";
+
+    photos.forEach(([id, photo]) => {
+      const unlocked = collection.photos.includes(id);
+      const card = document.createElement("article");
+      card.className = `photo-card${unlocked ? " is-unlocked" : " is-locked"}`;
+      card.dataset.scene = photo.scene;
+
+      const visual = document.createElement("div");
+      visual.className = "photo-visual";
+      if (unlocked) {
+        const image = document.createElement("img");
+        image.src = `assets/characters/yoonseo/${photo.expression}.png`;
+        image.alt = "";
+        visual.appendChild(image);
+      } else {
+        visual.textContent = "?";
+      }
+
+      const copy = document.createElement("div");
+      const subtitle = document.createElement("span");
+      const title = document.createElement("strong");
+      const description = document.createElement("p");
+      subtitle.textContent = unlocked ? photo.subtitle : "LOCKED MEMORY";
+      title.textContent = unlocked ? photo.title : "미발견 사진";
+      description.textContent = unlocked ? photo.description : "데이트와 보너스 게임에서 해금됩니다.";
+      copy.append(subtitle, title, description);
+      card.append(visual, copy);
+      elements.photoAlbum.appendChild(card);
+    });
+
+    achievements.forEach(([id, achievement], index) => {
+      const unlocked = collection.achievements.includes(id);
+      const item = document.createElement("article");
+      item.className = `achievement-item${unlocked ? " is-unlocked" : " is-locked"}`;
+      const number = document.createElement("span");
+      const copy = document.createElement("div");
+      const title = document.createElement("strong");
+      const description = document.createElement("p");
+      number.textContent = unlocked ? String(index + 1).padStart(2, "0") : "??";
+      title.textContent = unlocked ? achievement.title : "미발견 업적";
+      description.textContent = unlocked ? achievement.description : "조건을 만족하면 공개됩니다.";
+      copy.append(title, description);
+      item.append(number, copy);
+      elements.achievementList.appendChild(item);
+    });
+  }
+
+  function stopMinigame() {
+    window.cancelAnimationFrame(minigameFrame);
+    window.clearTimeout(minigameTimer);
+    minigameFrame = 0;
+    minigameTimer = 0;
+    minigameState = null;
+  }
+
+  function startMinigame(config) {
+    if (!config || !["quiz", "timing"].includes(config.type)) {
+      throw new Error("지원하지 않는 미니게임 설정입니다.");
+    }
+
+    minigameState = {
+      config,
+      round: 0,
+      score: 0,
+      locked: false,
+      position: 0,
+    };
+    elements.minigameTitle.textContent = config.title;
+    elements.minigameSubtitle.textContent = config.subtitle;
+    elements.minigameFeedback.textContent = "";
+    elements.minigameStage.innerHTML = "";
+    elements.minigameControls.innerHTML = "";
+
+    if (typeof state.minigames[config.id] === "number") {
+      renderMinigameResult(state.minigames[config.id], true);
+      return;
+    }
+
+    if (config.type === "quiz") renderQuizRound();
+    else renderTimingRound();
+  }
+
+  function renderQuizRound() {
+    const { config, round } = minigameState;
+    const question = config.questions[round];
+    elements.minigameRound.textContent = `ROUND ${round + 1} / ${config.questions.length}`;
+    elements.minigameStage.innerHTML = "";
+    elements.minigameControls.innerHTML = "";
+    elements.minigameFeedback.textContent = "윤서의 표정을 골라 주세요.";
+
+    const prompt = document.createElement("p");
+    prompt.className = "minigame-prompt";
+    prompt.textContent = question.prompt;
+    elements.minigameStage.appendChild(prompt);
+
+    question.options.forEach((option, index) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "minigame-action";
+      button.dataset.minigameAnswer = String(index);
+      button.dataset.minigameBest = String(index === question.answer);
+      button.textContent = `${index + 1}. ${option}`;
+      button.addEventListener("click", (event) => {
+        event.stopPropagation();
+        answerQuiz(index);
+      });
+      elements.minigameControls.appendChild(button);
+    });
+  }
+
+  function answerQuiz(answer) {
+    if (!minigameState || minigameState.locked) return;
+    minigameState.locked = true;
+    const question = minigameState.config.questions[minigameState.round];
+    const correct = answer === question.answer;
+    minigameState.score += correct ? 100 : 40;
+    elements.minigameFeedback.textContent = correct
+      ? "정답 · 윤서가 만족스럽게 웃었다."
+      : `아쉽다 · 정답은 ‘${question.options[question.answer]}’`;
+    elements.minigameControls.querySelectorAll("button").forEach((button) => {
+      button.disabled = true;
+      button.classList.toggle(
+        "is-correct",
+        Number(button.dataset.minigameAnswer) === question.answer,
+      );
+    });
+
+    minigameTimer = window.setTimeout(() => {
+      minigameState.round += 1;
+      minigameState.locked = false;
+      if (minigameState.round >= minigameState.config.questions.length) finishMinigame();
+      else renderQuizRound();
+    }, 320);
+  }
+
+  function renderTimingRound() {
+    const { config, round } = minigameState;
+    elements.minigameRound.textContent = `SHOT ${round + 1} / ${config.rounds}`;
+    elements.minigameStage.innerHTML = "";
+    elements.minigameControls.innerHTML = "";
+    elements.minigameFeedback.textContent = "분홍색 구간에 맞춰 셔터를 누르세요.";
+
+    const track = document.createElement("div");
+    const target = document.createElement("i");
+    const marker = document.createElement("span");
+    track.className = "timing-track";
+    target.className = "timing-target";
+    marker.className = "timing-marker";
+    track.append(target, marker);
+    elements.minigameStage.appendChild(track);
+
+    const shutter = document.createElement("button");
+    shutter.type = "button";
+    shutter.className = "minigame-action primary";
+    shutter.dataset.minigamePrimary = "true";
+    shutter.textContent = "SHUTTER";
+    shutter.addEventListener("click", (event) => {
+      event.stopPropagation();
+      stopTimingRound(shutter);
+    });
+    elements.minigameControls.appendChild(shutter);
+
+    const startedAt = performance.now();
+    const tick = (timestamp) => {
+      if (!minigameState || minigameState.locked) return;
+      const phase = ((timestamp - startedAt) % config.duration) / config.duration;
+      const position = phase <= 0.5 ? phase * 200 : (1 - phase) * 200;
+      minigameState.position = position;
+      marker.style.left = `${position}%`;
+      minigameFrame = requestAnimationFrame(tick);
+    };
+    minigameFrame = requestAnimationFrame(tick);
+  }
+
+  function stopTimingRound(button) {
+    if (!minigameState || minigameState.locked) return;
+    minigameState.locked = true;
+    window.cancelAnimationFrame(minigameFrame);
+    button.disabled = true;
+    const roundScore = Math.max(20, Math.round(100 - Math.abs(minigameState.position - 50) * 3));
+    minigameState.score += roundScore;
+    elements.minigameFeedback.textContent = `${roundScore}점 · ${
+      roundScore >= 80 ? "윤서까지 선명하게 찍혔다!" : "조금 흔들렸지만 사진은 남았다."
+    }`;
+
+    minigameTimer = window.setTimeout(() => {
+      minigameState.round += 1;
+      minigameState.locked = false;
+      if (minigameState.round >= minigameState.config.rounds) finishMinigame();
+      else renderTimingRound();
+    }, 320);
+  }
+
+  function finishMinigame() {
+    const { config, score } = minigameState;
+    state.minigames[config.id] = score;
+    applyEffects(config.reward || {});
+    applyUnlocks(config.completeUnlocks || []);
+    if (score >= config.highScore) applyUnlocks(config.highScoreUnlocks || []);
+    saveGame();
+    renderMinigameResult(score, false);
+  }
+
+  function renderMinigameResult(score, restored) {
+    const { config } = minigameState;
+    minigameState.locked = true;
+    elements.minigameRound.textContent = restored ? "SAVED RESULT" : "COMPLETE";
+    elements.minigameStage.innerHTML = "";
+    elements.minigameControls.innerHTML = "";
+
+    const result = document.createElement("div");
+    const label = document.createElement("span");
+    const value = document.createElement("strong");
+    result.className = "minigame-result";
+    label.textContent = score >= config.highScore ? "S RANK" : score >= config.highScore * 0.7 ? "A RANK" : "B RANK";
+    value.textContent = String(score);
+    result.append(label, value);
+    elements.minigameStage.appendChild(result);
+    elements.minigameFeedback.textContent = restored
+      ? "저장된 결과를 불러왔습니다."
+      : "보상과 앨범 항목이 저장되었습니다.";
+
+    const continueButton = document.createElement("button");
+    continueButton.type = "button";
+    continueButton.className = "minigame-action primary";
+    continueButton.dataset.minigamePrimary = "true";
+    continueButton.textContent = "계속";
+    continueButton.addEventListener("click", (event) => {
+      event.stopPropagation();
+      showNode(config.next);
+    });
+    elements.minigameControls.appendChild(continueButton);
   }
 
   function showChapter(chapterId, quiet = false) {
@@ -1922,6 +2246,12 @@
     const unlocked = new Set(readStorage(ENDINGS_KEY, []));
     unlocked.add(endingId);
     writeStorage(ENDINGS_KEY, [...unlocked]);
+    if (endingId === "dawn") {
+      applyUnlocks([
+        { type: "photo", id: "first-real-date" },
+        { type: "achievement", id: "true-dawn" },
+      ]);
+    }
     removeStorage(SAVE_KEY);
     audio.chime("ending");
     renderer.setScene(ending.scene, endingId === "dawn" ? "seo" : null, endingId === "dawn" ? "smile" : "neutral");
@@ -2022,6 +2352,7 @@
   function goToTitle() {
     closeAllModals();
     window.cancelAnimationFrame(typingFrame);
+    stopMinigame();
     renderer.setScene("title", null, "neutral");
     transitionTo(() => {
       changeScreen("title");
@@ -2037,6 +2368,10 @@
       continue: continueGame,
       "open-settings": () => openModal(elements.settingsModal),
       "open-log": () => openModal(elements.logModal),
+      "open-collection": () => {
+        renderCollection();
+        openModal(elements.collectionModal);
+      },
       "open-menu": () => openModal(elements.pauseModal),
       "close-modal": closeAllModals,
       "toggle-sound": toggleSound,
@@ -2047,6 +2382,7 @@
   }
 
   function onKeyDown(event) {
+    if (event.repeat && minigameState) return;
     if (event.key === "m" || event.key === "M") {
       toggleSound();
       return;
@@ -2060,6 +2396,14 @@
 
     if (anyModalOpen()) return;
 
+    if (activeScreen === "game" && minigameState && /^[1-4]$/.test(event.key)) {
+      const button = elements.minigameControls.querySelectorAll(".minigame-action")[
+        Number(event.key) - 1
+      ];
+      if (button && !button.disabled) button.click();
+      return;
+    }
+
     if (activeScreen === "game" && /^[1-4]$/.test(event.key) && !typing) {
       const button = elements.choicePanel.querySelectorAll(".choice-button")[Number(event.key) - 1];
       if (button && !button.disabled) button.click();
@@ -2068,6 +2412,13 @@
 
     if (activeScreen === "game" && (event.key === "Enter" || event.code === "Space")) {
       event.preventDefault();
+      if (minigameState) {
+        const primary = elements.minigameControls.querySelector(
+          ".minigame-action[data-minigame-primary='true']:not(:disabled)",
+        );
+        if (primary) primary.click();
+        return;
+      }
       advanceStory();
     }
   }
@@ -2087,6 +2438,7 @@
   });
   elements.schedulePanel.addEventListener("click", (event) => event.stopPropagation());
   elements.phoneMessages.addEventListener("click", (event) => event.stopPropagation());
+  elements.minigamePanel.addEventListener("click", (event) => event.stopPropagation());
 
   elements.textSpeed.addEventListener("input", (event) => {
     settings.textSpeed = Number(event.target.value);
@@ -2105,8 +2457,18 @@
     elements.textSpeed.value = String(settings.textSpeed);
     updateSoundUI();
     updateEndingBadges();
+    if (new Set(readStorage(ENDINGS_KEY, [])).has("dawn")) {
+      applyUnlocks(
+        [
+          { type: "photo", id: "first-real-date" },
+          { type: "achievement", id: "true-dawn" },
+        ],
+        { quiet: true },
+      );
+    }
     updateContinueButton();
     updateStatusUI();
+    updateCollectionCount();
     renderer.setScene("title", null);
   }
 

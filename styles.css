@@ -503,6 +503,27 @@ button:disabled {
   letter-spacing: 0.05em;
 }
 
+.collection-button {
+  position: relative;
+}
+
+.collection-button > span {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  display: grid;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  place-items: center;
+  border-radius: 9px;
+  color: #24131c;
+  background: #ff9fc2;
+  font-family: Consolas, monospace;
+  font-size: 8px;
+  box-shadow: 0 0 9px rgba(255, 105, 158, 0.55);
+}
+
 .dialogue-box {
   position: absolute;
   z-index: 4;
@@ -819,7 +840,190 @@ button:disabled {
   text-align: center;
 }
 
+.minigame-panel {
+  position: absolute;
+  z-index: 8;
+  top: 50%;
+  left: 50%;
+  display: grid;
+  visibility: hidden;
+  width: min(720px, calc(100% - 36px));
+  min-height: 430px;
+  padding: 28px;
+  border: 1px solid rgba(255, 145, 184, 0.48);
+  background:
+    radial-gradient(circle at 80% 10%, rgba(255, 105, 158, 0.13), transparent 35%),
+    linear-gradient(145deg, rgba(10, 31, 49, 0.98), rgba(4, 12, 23, 0.98));
+  box-shadow:
+    0 28px 100px rgba(0, 0, 0, 0.58),
+    inset 0 0 0 4px rgba(255, 255, 255, 0.018);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -46%);
+  transition:
+    opacity 0.35s var(--ease),
+    transform 0.35s var(--ease);
+}
+
+.minigame-panel.is-visible {
+  visibility: visible;
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate(-50%, -50%);
+}
+
+.minigame-panel header {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: baseline;
+  padding-bottom: 15px;
+  border-bottom: 1px solid rgba(156, 212, 226, 0.18);
+}
+
+.minigame-panel header > span {
+  grid-column: 1 / -1;
+  margin-bottom: 7px;
+  color: #ff9fc2;
+  font-family: Consolas, monospace;
+  font-size: 9px;
+  letter-spacing: 0.22em;
+}
+
+.minigame-panel header strong {
+  font-family: "Nanum Myeongjo", "Batang", serif;
+  font-size: 25px;
+  font-weight: 400;
+}
+
+.minigame-panel header small {
+  color: rgba(198, 228, 237, 0.48);
+  font-family: Consolas, monospace;
+  font-size: 9px;
+  letter-spacing: 0.12em;
+}
+
+.minigame-subtitle,
+.minigame-feedback {
+  margin: 14px 0 0;
+  color: rgba(221, 239, 244, 0.62);
+  font-size: 13px;
+}
+
+.minigame-stage {
+  display: grid;
+  min-height: 145px;
+  margin-top: 18px;
+  place-items: center;
+  border: 1px solid rgba(156, 212, 226, 0.16);
+  background: rgba(2, 10, 18, 0.48);
+}
+
+.minigame-prompt {
+  max-width: 560px;
+  margin: 0;
+  padding: 24px;
+  font-family: "Nanum Myeongjo", "Batang", serif;
+  font-size: 20px;
+  line-height: 1.75;
+  text-align: center;
+}
+
+.minigame-controls {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 15px;
+}
+
+.minigame-action {
+  min-height: 48px;
+  padding: 10px 14px;
+  border: 1px solid rgba(163, 218, 232, 0.3);
+  color: rgba(239, 249, 251, 0.9);
+  background: rgba(8, 27, 42, 0.92);
+  cursor: pointer;
+  transition:
+    border-color 0.2s,
+    background 0.2s,
+    transform 0.2s;
+}
+
+.minigame-action:hover:not(:disabled),
+.minigame-action.is-correct {
+  border-color: #ff9fc2;
+  background: rgba(113, 48, 78, 0.54);
+  transform: translateY(-2px);
+}
+
+.minigame-action.primary {
+  grid-column: 1 / -1;
+  border-color: rgba(255, 145, 184, 0.58);
+  color: #fff4f8;
+  background: linear-gradient(90deg, rgba(113, 48, 78, 0.7), rgba(27, 83, 103, 0.7));
+  font-family: Consolas, monospace;
+  letter-spacing: 0.16em;
+}
+
+.minigame-action:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.timing-track {
+  position: relative;
+  width: min(520px, calc(100% - 40px));
+  height: 18px;
+  border: 1px solid rgba(154, 207, 221, 0.34);
+  background: linear-gradient(90deg, rgba(22, 55, 72, 0.8), rgba(55, 79, 94, 0.42));
+}
+
+.timing-target {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  left: 42%;
+  width: 16%;
+  border: 1px solid #ff9fc2;
+  background: rgba(255, 105, 158, 0.24);
+  box-shadow: 0 0 16px rgba(255, 105, 158, 0.46);
+}
+
+.timing-marker {
+  position: absolute;
+  top: 50%;
+  width: 5px;
+  height: 32px;
+  background: #fff;
+  box-shadow: 0 0 11px var(--cyan);
+  transform: translate(-50%, -50%);
+}
+
+.minigame-result {
+  display: grid;
+  place-items: center;
+}
+
+.minigame-result span {
+  color: #ff9fc2;
+  font-family: Consolas, monospace;
+  font-size: 11px;
+  letter-spacing: 0.22em;
+}
+
+.minigame-result strong {
+  margin-top: 7px;
+  font-family: Consolas, monospace;
+  font-size: 54px;
+  font-weight: 300;
+}
+
 .game-screen[data-mode="message"] .dialogue-box {
+  visibility: hidden;
+  opacity: 0;
+}
+
+.game-screen[data-mode="minigame"] .dialogue-box,
+.game-screen[data-mode="minigame"] .choice-panel {
   visibility: hidden;
   opacity: 0;
 }
@@ -974,6 +1178,34 @@ button:disabled {
   color: #ffb6cf;
 }
 
+.choice-button.is-sticker-choice {
+  border-color: rgba(255, 145, 184, 0.36);
+  background: linear-gradient(90deg, rgba(60, 30, 52, 0.96), rgba(14, 23, 38, 0.96));
+}
+
+.choice-button.is-sticker-choice .choice-copy {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.choice-sticker-symbol {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 9px;
+  color: #321827;
+  background: #ffb6cf;
+  font-family: sans-serif;
+  font-size: 18px;
+  box-shadow: 0 0 12px rgba(255, 105, 158, 0.32);
+}
+
+.choice-sticker-label {
+  color: #ffdce8;
+}
+
 .chapter-card {
   position: absolute;
   z-index: 12;
@@ -1117,6 +1349,147 @@ button:disabled {
   margin-top: 80px;
   color: var(--muted);
   text-align: center;
+}
+
+.collection-panel {
+  width: min(1020px, 100%);
+  overflow-y: auto;
+}
+
+.collection-section + .collection-section {
+  margin-top: 32px;
+}
+
+.collection-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 13px;
+}
+
+.collection-heading h3 {
+  margin: 0;
+  font-family: "Nanum Myeongjo", "Batang", serif;
+  font-size: 18px;
+  font-weight: 400;
+}
+
+.collection-heading span {
+  color: #ff9fc2;
+  font-family: Consolas, monospace;
+  font-size: 10px;
+}
+
+.photo-album {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.photo-card {
+  display: grid;
+  min-width: 0;
+  border: 1px solid rgba(143, 202, 216, 0.2);
+  background: rgba(4, 15, 26, 0.72);
+}
+
+.photo-visual {
+  position: relative;
+  display: grid;
+  height: 142px;
+  overflow: hidden;
+  place-items: center;
+  color: rgba(198, 228, 237, 0.16);
+  background:
+    linear-gradient(145deg, rgba(27, 72, 88, 0.58), rgba(10, 25, 42, 0.84)),
+    var(--night);
+  font-family: Consolas, monospace;
+  font-size: 40px;
+}
+
+.photo-card[data-scene="cafe"] .photo-visual {
+  background: linear-gradient(145deg, rgba(131, 77, 52, 0.62), rgba(25, 27, 42, 0.92));
+}
+
+.photo-card[data-scene="photo"] .photo-visual {
+  background: linear-gradient(145deg, rgba(101, 65, 101, 0.66), rgba(14, 28, 44, 0.92));
+}
+
+.photo-card[data-scene="dawn"] .photo-visual {
+  background: linear-gradient(145deg, rgba(218, 144, 111, 0.66), rgba(58, 72, 98, 0.92));
+}
+
+.photo-visual img {
+  position: absolute;
+  top: 4%;
+  left: 50%;
+  width: 74%;
+  height: auto;
+  transform: translateX(-50%);
+  filter: drop-shadow(0 9px 14px rgba(0, 0, 0, 0.42));
+}
+
+.photo-card > div:last-child {
+  padding: 12px 13px 14px;
+}
+
+.photo-card span,
+.achievement-item > span {
+  color: rgba(101, 230, 239, 0.5);
+  font-family: Consolas, monospace;
+  font-size: 8px;
+  letter-spacing: 0.1em;
+}
+
+.photo-card strong,
+.achievement-item strong {
+  display: block;
+  margin-top: 5px;
+  font-size: 14px;
+}
+
+.photo-card p,
+.achievement-item p {
+  margin: 6px 0 0;
+  color: rgba(216, 235, 240, 0.56);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.photo-card.is-locked,
+.achievement-item.is-locked {
+  filter: grayscale(1);
+  opacity: 0.48;
+}
+
+.achievement-list {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.achievement-item {
+  display: grid;
+  grid-template-columns: 38px 1fr;
+  align-items: center;
+  gap: 12px;
+  min-height: 72px;
+  padding: 11px 13px;
+  border: 1px solid rgba(143, 202, 216, 0.18);
+  background: rgba(4, 15, 26, 0.62);
+}
+
+.achievement-item > span {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid rgba(255, 145, 184, 0.42);
+  color: #ffb6cf;
+}
+
+.achievement-item strong {
+  margin-top: 0;
 }
 
 .setting-row {
@@ -1444,6 +1817,15 @@ kbd {
     padding: 15px;
   }
 
+  .hud-actions {
+    gap: 5px;
+  }
+
+  .icon-button {
+    width: 35px;
+    height: 35px;
+  }
+
   .status-cluster {
     top: 68px;
     left: 15px;
@@ -1562,6 +1944,38 @@ kbd {
     bottom: auto;
   }
 
+  .minigame-panel {
+    width: calc(100% - 20px);
+    min-height: 420px;
+    padding: 20px;
+  }
+
+  .minigame-panel header strong {
+    font-size: 21px;
+  }
+
+  .minigame-prompt {
+    padding: 18px;
+    font-size: 17px;
+  }
+
+  .minigame-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .minigame-action.primary {
+    grid-column: 1;
+  }
+
+  .photo-album,
+  .achievement-list {
+    grid-template-columns: 1fr;
+  }
+
+  .photo-visual {
+    height: 180px;
+  }
+
   .choice-button {
     grid-template-columns: 36px 1fr;
     min-height: 58px;
@@ -1622,6 +2036,12 @@ kbd {
 
   .speaker-row {
     margin-bottom: 8px;
+  }
+
+  .choice-panel.is-message {
+    bottom: 8px;
+    align-content: start;
+    overflow-y: auto;
   }
 }
 
@@ -1733,6 +2153,17 @@ kbd {
 }
 
 @media (max-height: 600px) {
+  #collectionModal {
+    position: fixed;
+    height: 100dvh;
+    padding: 8px;
+  }
+
+  #collectionModal .collection-panel {
+    height: calc(100dvh - 16px);
+    max-height: calc(100dvh - 16px);
+  }
+
   .game-screen[data-mode="schedule"] .game-hud,
   .game-screen[data-mode="message"] .game-hud {
     opacity: 0.16;
@@ -1742,6 +2173,64 @@ kbd {
   .game-screen[data-mode="schedule"] .dialogue-box {
     visibility: hidden;
     opacity: 0;
+  }
+
+  .minigame-panel {
+    top: 8px;
+    right: 10px;
+    bottom: auto;
+    left: 10px;
+    width: auto;
+    height: calc(100vh - 16px);
+    min-height: 0;
+    max-height: calc(100vh - 16px);
+    padding: 13px;
+    overflow-y: auto;
+    transform: none;
+  }
+
+  .minigame-panel.is-visible {
+    transform: none;
+  }
+
+  .minigame-panel header {
+    padding-bottom: 8px;
+  }
+
+  .minigame-panel header strong {
+    font-size: 18px;
+  }
+
+  .minigame-subtitle,
+  .minigame-feedback {
+    margin-top: 7px;
+    font-size: 11px;
+  }
+
+  .minigame-stage {
+    min-height: 86px;
+    margin-top: 8px;
+  }
+
+  .minigame-prompt {
+    padding: 10px;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  .minigame-controls {
+    grid-template-columns: repeat(3, 1fr);
+    margin-top: 8px;
+  }
+
+  .minigame-action {
+    min-height: 38px;
+    padding: 6px 8px;
+    font-size: 11px;
+  }
+
+  .minigame-action.primary {
+    grid-column: 1 / -1;
   }
 
   .schedule-panel {

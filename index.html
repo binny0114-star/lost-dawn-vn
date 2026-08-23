@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="새벽 2시 17분, 다섯 번의 데이트로 잃어버린 연인과 관계를 다시 쌓는 미스터리 연애 시뮬레이션."
+      content="다섯 번의 데이트, 미니게임, 메시지와 수집 요소로 잃어버린 연인과 관계를 다시 쌓는 미스터리 연애 시뮬레이션."
     />
     <meta name="theme-color" content="#07111f" />
     <meta name="robots" content="noindex, nofollow, noarchive" />
@@ -14,6 +14,7 @@
     <link rel="stylesheet" href="styles.css" />
     <script src="story-expansion.js" defer></script>
     <script src="dating-sim.js" defer></script>
+    <script src="romance-extras.js" defer></script>
     <script src="game.js" defer></script>
   </head>
   <body>
@@ -28,7 +29,7 @@
         <div class="title-kicker">
           <span>SINGLE-HEROINE ROMANCE SIM</span>
           <i aria-hidden="true"></i>
-          <span>5 MEMORY DATES · 4 ENDINGS</span>
+          <span>5 DATES · 2 MINI GAMES · 4 ENDINGS</span>
         </div>
 
         <div class="title-lockup">
@@ -99,6 +100,15 @@
             <button type="button" class="icon-button text-icon" data-action="open-log" aria-label="대화 기록">
               LOG
             </button>
+            <button
+              type="button"
+              class="icon-button text-icon collection-button"
+              data-action="open-collection"
+              aria-label="사진 앨범과 업적"
+            >
+              COL
+              <span id="collectionCount">0</span>
+            </button>
             <button type="button" class="icon-button" data-action="open-menu" aria-label="메뉴">
               <span aria-hidden="true">≡</span>
             </button>
@@ -127,6 +137,18 @@
           </header>
           <div id="phoneMessages" class="phone-messages"></div>
           <p id="phoneHint" class="phone-hint">답장을 선택하세요</p>
+        </section>
+
+        <section id="minigamePanel" class="minigame-panel" aria-live="polite" aria-hidden="true">
+          <header>
+            <span>BONUS GAME</span>
+            <strong id="minigameTitle"></strong>
+            <small id="minigameRound"></small>
+          </header>
+          <p id="minigameSubtitle" class="minigame-subtitle"></p>
+          <div id="minigameStage" class="minigame-stage"></div>
+          <p id="minigameFeedback" class="minigame-feedback"></p>
+          <div id="minigameControls" class="minigame-controls"></div>
         </section>
 
         <div id="choicePanel" class="choice-panel" aria-label="선택지"></div>
@@ -173,6 +195,38 @@
             <button type="button" class="close-button" data-action="close-modal" aria-label="닫기">×</button>
           </header>
           <div id="logContent" class="log-content"></div>
+        </div>
+      </div>
+
+      <div
+        id="collectionModal"
+        class="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="collectionTitle"
+      >
+        <div class="modal-panel collection-panel">
+          <header class="modal-header">
+            <div>
+              <span>MEMORY COLLECTION</span>
+              <h2 id="collectionTitle">사진 앨범 · 업적</h2>
+            </div>
+            <button type="button" class="close-button" data-action="close-modal" aria-label="닫기">×</button>
+          </header>
+          <section class="collection-section" aria-labelledby="albumTitle">
+            <div class="collection-heading">
+              <h3 id="albumTitle">데이트 앨범</h3>
+              <span id="photoCount">0 / 0</span>
+            </div>
+            <div id="photoAlbum" class="photo-album"></div>
+          </section>
+          <section class="collection-section" aria-labelledby="achievementTitle">
+            <div class="collection-heading">
+              <h3 id="achievementTitle">업적</h3>
+              <span id="achievementCount">0 / 0</span>
+            </div>
+            <div id="achievementList" class="achievement-list"></div>
+          </section>
         </div>
       </div>
 

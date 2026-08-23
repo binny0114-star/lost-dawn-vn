@@ -114,6 +114,12 @@
             response: "응. 내일은 기억 말고 사람을 만나러 와 줬으면 좋겠다.",
             effects: { trust: -1 },
           },
+          {
+            text: "[스티커] 코코아 두 잔",
+            response: "말 대신 컵 두 개라니. 하나는 내 거라고 믿는다?",
+            effects: { affection: 1 },
+            sticker: { symbol: "☕", label: "같이 마시자" },
+          },
         ],
       },
     },
@@ -199,6 +205,12 @@
             text: "어떤 모습이 되든 네가 직접 고르면 옆에서 알아 갈게.",
             response: "응. 그럼 모르는 내가 되어도 다시 소개할게. 한윤서라고.",
             effects: { affection: 1, trust: 1 },
+          },
+          {
+            text: "[스티커] 브이 하는 윤서",
+            response: "이 표정 언제 저장했어? ……지우지는 마.",
+            effects: { affection: 1 },
+            sticker: { symbol: "✌", label: "찰칵!" },
           },
         ],
       },
@@ -286,6 +298,12 @@
             response: "그래. 또 우리 이야기가 덜 중요한 게 된 건 아니었으면 해.",
             effects: { trust: -1 },
           },
+          {
+            text: "[스티커] 화해 신청서",
+            response: "신청 접수. 단, 같은 잘못 반복 시 반려합니다.",
+            effects: { affection: 1 },
+            sticker: { symbol: "✓", label: "화해할래?" },
+          },
         ],
       },
     },
@@ -372,6 +390,12 @@
             response: "아직 나가지도 않았는데 벌써 다음으로 미루는구나.",
             effects: { trust: -1 },
           },
+          {
+            text: "[스티커] 아무것도 안 하는 중",
+            response: "좋아. 이 스티커처럼 나란히 늘어져 있는 날도 예약.",
+            effects: { affection: 1 },
+            sticker: { symbol: "…", label: "같이 쉬자" },
+          },
         ],
       },
     },
@@ -457,6 +481,12 @@
             text: "좋아해. 기억이 돌아와서가 아니라 지금의 너를.",
             response: "……응. 그 답이면 밖에서도 다시 만나 줄게.",
             effects: { affection: 1, courage: 1 },
+          },
+          {
+            text: "[스티커] 다음 약속 확정",
+            response: "스티커로 고백을 피했네. 그래도 약속은 확정이야.",
+            effects: { affection: 1 },
+            sticker: { symbol: "♥", label: "NEXT DATE" },
           },
         ],
       },
@@ -571,6 +601,7 @@
         next: `dateMessage${dayId}Result`,
         effects: reply.effects,
         flag: `date_reply_${day.number}_${index}`,
+        sticker: reply.sticker,
       }));
 
       story[`dateMessage${dayId}`] = line(
