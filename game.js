@@ -4,6 +4,7 @@
   const SAVE_KEY = "lost-dawn-save-v1";
   const SETTINGS_KEY = "lost-dawn-settings-v1";
   const ENDINGS_KEY = "lost-dawn-endings-v1";
+  const STORY_VERSION = 2;
   const ENDING_ORDER = ["memory", "oblivion", "keeper", "dawn"];
 
   const $ = (selector) => document.querySelector(selector);
@@ -23,6 +24,7 @@
     chapterCardName: $("#chapterCardName"),
     memoryShards: $("#memoryShards"),
     syncFill: $("#syncFill"),
+    resolveFill: $("#resolveFill"),
     speakerName: $("#speakerName"),
     speakerEn: $("#speakerEn"),
     dialogueText: $("#dialogueText"),
@@ -737,6 +739,11 @@
     ),
   };
 
+  if (!window.LostDawnStoryExpansion) {
+    throw new Error("확장 스토리 모듈을 불러오지 못했습니다.");
+  }
+  window.LostDawnStoryExpansion.apply(STORY, chapters, endings, line);
+
   const defaultSettings = {
     textSpeed: 24,
     sound: true,
@@ -763,7 +770,30 @@
       flags: {},
       history: [],
       startedAt: Date.now(),
+      storyVersion: STORY_VERSION,
     };
+  }
+
+  function migrateSavedState(saved) {
+    const migrated = {
+      ...saved,
+      flags: { ...(saved.flags || {}) },
+      storyVersion: STORY_VERSION,
+    };
+    const stats = saved.stats || {};
+    const isLegacyFinale = ["f01", "f02", "f03", "f04"].includes(saved.node);
+
+    if (
+      !saved.storyVersion &&
+      isLegacyFinale &&
+      stats.memory >= 4 &&
+      stats.trust >= 4 &&
+      stats.courage >= 3
+    ) {
+      migrated.flags.legacy_true_ending_eligible = true;
+    }
+
+    return migrated;
   }
 
   function readStorage(key, fallback) {
@@ -1573,12 +1603,14 @@
       return;
     }
 
+    const initialState = createInitialState();
+    const migrated = migrateSavedState(saved);
     state = {
-      ...createInitialState(),
-      ...saved,
-      stats: { ...createInitialState().stats, ...saved.stats },
-      flags: { ...saved.flags },
-      history: Array.isArray(saved.history) ? saved.history : [],
+      ...initialState,
+      ...migrated,
+      stats: { ...initialState.stats, ...migrated.stats },
+      flags: migrated.flags,
+      history: Array.isArray(migrated.history) ? migrated.history : [],
     };
     audio.start();
     transitionTo(() => {
@@ -1755,8 +1787,10 @@
       elements.memoryShards.appendChild(shard);
     }
     elements.memoryShards.setAttribute("aria-label", `기억 조각 ${state.stats.memory}개`);
-    const sync = Math.min(100, ((state.stats.trust + state.stats.courage) / 10) * 100);
+    const sync = Math.min(100, (state.stats.trust / 5) * 100);
     elements.syncFill.style.width = `${sync}%`;
+    const resolve = Math.min(100, (state.stats.courage / 5) * 100);
+    elements.resolveFill.style.width = `${resolve}%`;
   }
 
   function saveGame() {
