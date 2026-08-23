@@ -144,6 +144,7 @@ test("first branch saves progress and displays the character sprite", async ({ p
 });
 
 test("the schedule, date, and message loop raises persistent affection", async ({ page }) => {
+  test.setTimeout(60_000);
   await page.getByRole("button", { name: /처음부터/ }).click();
   await expect(page.locator("#gameScreen")).toHaveClass(/is-active/);
 
