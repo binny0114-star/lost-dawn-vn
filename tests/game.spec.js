@@ -67,6 +67,8 @@ test.beforeEach(async ({ page }) => {
 test("title screen exposes the game and attribution", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "분실된 새벽" })).toBeVisible();
   await expect(page.locator(".title-kicker")).toContainText("SINGLE-HEROINE ROMANCE SIM");
+  await expect(page.locator('script[src="dating-sim.js?v=4"]')).toHaveCount(1);
+  await expect(page.locator('script[src="game.js?v=4"]')).toHaveCount(1);
   await expect(page.locator("#affectionHearts")).toHaveAttribute("aria-label", "윤서 호감도 0 / 10");
   await expect(page.getByRole("button", { name: /이어하기/ })).toBeDisabled();
   await expect(page.getByRole("link", { name: "XIAEL" })).toHaveAttribute(
