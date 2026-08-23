@@ -4,7 +4,7 @@
   const SAVE_KEY = "lost-dawn-save-v1";
   const SETTINGS_KEY = "lost-dawn-settings-v1";
   const ENDINGS_KEY = "lost-dawn-endings-v1";
-  const STORY_VERSION = 2;
+  const STORY_VERSION = 3;
   const ENDING_ORDER = ["memory", "oblivion", "keeper", "dawn"];
 
   const $ = (selector) => document.querySelector(selector);
@@ -25,6 +25,18 @@
     memoryShards: $("#memoryShards"),
     syncFill: $("#syncFill"),
     resolveFill: $("#resolveFill"),
+    affectionHearts: $("#affectionHearts"),
+    schedulePanel: $("#schedulePanel"),
+    schedulePhase: $("#schedulePhase"),
+    scheduleTitle: $("#scheduleTitle"),
+    scheduleDays: $("#scheduleDays"),
+    scheduleHint: $("#scheduleHint"),
+    phonePanel: $("#phonePanel"),
+    phoneDay: $("#phoneDay"),
+    phoneContact: $("#phoneContact"),
+    phoneTime: $("#phoneTime"),
+    phoneMessages: $("#phoneMessages"),
+    phoneHint: $("#phoneHint"),
     speakerName: $("#speakerName"),
     speakerEn: $("#speakerEn"),
     dialogueText: $("#dialogueText"),
@@ -743,6 +755,10 @@
     throw new Error("확장 스토리 모듈을 불러오지 못했습니다.");
   }
   window.LostDawnStoryExpansion.apply(STORY, chapters, endings, line);
+  if (!window.LostDawnDatingSim) {
+    throw new Error("연애 시뮬레이션 모듈을 불러오지 못했습니다.");
+  }
+  window.LostDawnDatingSim.apply(STORY, chapters, endings, line);
 
   const defaultSettings = {
     textSpeed: 24,
@@ -761,12 +777,13 @@
   let transitionTimer = 0;
   let transitioning = false;
   let toastTimer = 0;
+  let advanceBlockedUntil = 0;
 
   function createInitialState() {
     return {
       node: "p01",
       chapter: "",
-      stats: { memory: 0, trust: 0, courage: 0 },
+      stats: { memory: 0, trust: 0, courage: 0, affection: 0 },
       flags: {},
       history: [],
       startedAt: Date.now(),
@@ -777,11 +794,14 @@
   function migrateSavedState(saved) {
     const migrated = {
       ...saved,
+      stats: { ...(saved.stats || {}) },
       flags: { ...(saved.flags || {}) },
       storyVersion: STORY_VERSION,
     };
-    const stats = saved.stats || {};
+    const stats = migrated.stats;
+    const savedVersion = Number(saved.storyVersion) || 1;
     const isLegacyFinale = ["f01", "f02", "f03", "f04"].includes(saved.node);
+    const passedDatingLoop = /^(m|summer|t|r|f|em|eo|ek|ed)/.test(saved.node);
 
     if (
       !saved.storyVersion &&
@@ -791,6 +811,10 @@
       stats.courage >= 3
     ) {
       migrated.flags.legacy_true_ending_eligible = true;
+    }
+
+    if (savedVersion < 3 && passedDatingLoop && typeof stats.affection !== "number") {
+      stats.affection = 7;
     }
 
     return migrated;
@@ -1630,7 +1654,7 @@
     currentNode = node;
     state.node = id;
     fullText = String(resolve(node.text));
-    renderer.setScene(node.bg, node.char, node.emotion || "neutral");
+    renderer.setScene(node.bg, node.char, resolve(node.emotion || "neutral"));
 
     if (node.chapter && state.chapter !== node.chapter) {
       state.chapter = node.chapter;
@@ -1642,16 +1666,19 @@
     elements.speakerName.textContent = node.speaker;
     elements.speakerEn.textContent = speakerEnglish(node.speaker);
     elements.choicePanel.innerHTML = "";
-    elements.choicePanel.classList.remove("is-visible");
+    elements.choicePanel.classList.remove("is-visible", "is-schedule", "is-message");
     elements.continueMark.classList.remove("is-visible");
+    elements.gameScreen.dataset.mode = node.mode || "story";
+    updateStoryModeUI(node);
 
     if (!options.fromLoad) {
       state.history.push({ speaker: node.speaker, text: fullText, choice: false });
-      state.history = state.history.slice(-120);
+      state.history = state.history.slice(-220);
     }
 
     updateStatusUI();
-    beginTyping();
+    if (node.mode === "message" || node.mode === "schedule") completeTyping();
+    else beginTyping();
     saveGame();
   }
 
@@ -1666,6 +1693,46 @@
       "안내 방송": "ANNOUNCEMENT",
     };
     return names[speaker] || "VOICE";
+  }
+
+  function updateStoryModeUI(node) {
+    const scheduleVisible = node.mode === "schedule" && node.schedule;
+    const phoneVisible = node.mode === "message" && node.phone;
+    elements.schedulePanel.classList.toggle("is-visible", Boolean(scheduleVisible));
+    elements.schedulePanel.setAttribute("aria-hidden", String(!scheduleVisible));
+    elements.phonePanel.classList.toggle("is-visible", Boolean(phoneVisible));
+    elements.phonePanel.setAttribute("aria-hidden", String(!phoneVisible));
+
+    if (scheduleVisible) {
+      elements.schedulePhase.textContent = `MEMORY DATE ${String(node.schedule.day).padStart(2, "0")} / ${String(node.schedule.total).padStart(2, "0")}`;
+      elements.scheduleTitle.textContent = node.schedule.title;
+      elements.scheduleHint.textContent = node.schedule.hint;
+      elements.scheduleDays.innerHTML = "";
+      for (let day = 1; day <= node.schedule.total; day += 1) {
+        const marker = document.createElement("span");
+        const completed = Boolean(state.flags[`date_day_${day}`]);
+        marker.className = `${completed ? "is-complete" : ""}${day === node.schedule.day ? " is-current" : ""}`;
+        marker.textContent = String(day).padStart(2, "0");
+        marker.title = completed ? `${day}일 차 완료` : `${day}일 차`;
+        elements.scheduleDays.appendChild(marker);
+      }
+    }
+
+    if (phoneVisible) {
+      elements.phoneDay.textContent = node.phone.day;
+      elements.phoneContact.textContent = node.phone.contact;
+      elements.phoneTime.textContent = node.phone.time;
+      elements.phoneMessages.innerHTML = "";
+      const messages = resolve(node.phone.messages) || [];
+      messages.forEach((message) => {
+        const bubble = document.createElement("p");
+        bubble.className = `phone-bubble ${message.from === "me" ? "is-me" : "is-seo"}`;
+        bubble.textContent = message.text;
+        elements.phoneMessages.appendChild(bubble);
+      });
+      elements.phoneMessages.scrollTop = elements.phoneMessages.scrollHeight;
+      elements.phoneHint.textContent = node.choices ? "답장을 선택하세요" : "화면을 눌러 계속";
+    }
   }
 
   function beginTyping() {
@@ -1700,6 +1767,7 @@
 
   function advanceStory() {
     if (activeScreen !== "game" || anyModalOpen() || transitioning) return;
+    if (performance.now() < advanceBlockedUntil) return;
     if (typing) {
       completeTyping();
       return;
@@ -1717,6 +1785,8 @@
 
   function renderChoices(choices) {
     elements.choicePanel.innerHTML = "";
+    elements.choicePanel.classList.toggle("is-schedule", currentNode?.mode === "schedule");
+    elements.choicePanel.classList.toggle("is-message", currentNode?.mode === "message");
     choices.forEach((choice, index) => {
       const allowed = !choice.require || choice.require(state);
       const button = document.createElement("button");
@@ -1724,12 +1794,38 @@
       button.className = "choice-button";
       button.disabled = !allowed;
       button.style.transitionDelay = `${index * 65}ms`;
-      button.innerHTML = `
-        <span class="choice-number">${index + 1}</span>
-        <span class="choice-copy"></span>
-        ${allowed ? "" : `<span class="choice-lock">LOCKED · ${choice.lockedText || "조건 미달"}</span>`}
-      `;
-      button.querySelector(".choice-copy").textContent = choice.text;
+
+      const number = document.createElement("span");
+      number.className = "choice-number";
+      number.textContent = String(index + 1);
+      const copy = document.createElement("span");
+      copy.className = "choice-copy";
+
+      if (choice.activity) {
+        const code = document.createElement("small");
+        const name = document.createElement("strong");
+        const description = document.createElement("span");
+        code.textContent = choice.activity.code;
+        name.textContent = choice.activity.name;
+        description.textContent = choice.activity.description;
+        copy.append(code, name, description);
+      } else {
+        copy.textContent = choice.text;
+      }
+
+      button.append(number, copy);
+      if (choice.activity) {
+        const reward = document.createElement("span");
+        reward.className = "choice-reward";
+        reward.textContent = choice.activity.reward;
+        button.appendChild(reward);
+      } else if (!allowed) {
+        const lock = document.createElement("span");
+        lock.className = "choice-lock";
+        lock.textContent = `LOCKED · ${choice.lockedText || "조건 미달"}`;
+        button.appendChild(lock);
+      }
+
       button.addEventListener("click", (event) => {
         event.stopPropagation();
         selectChoice(choice);
@@ -1741,22 +1837,31 @@
 
   function selectChoice(choice) {
     if (choice.require && !choice.require(state)) return;
+    const blockRapidAdvance = currentNode?.mode === "message";
     state.history.push({ speaker: "선택", text: choice.text, choice: true });
     applyEffects(choice.effects || {});
     if (choice.flag) state.flags[choice.flag] = true;
+    if (Array.isArray(choice.flags)) {
+      choice.flags.forEach((flag) => {
+        state.flags[flag] = true;
+      });
+    }
     audio.start();
     audio.chime("choice");
-    showNode(choice.next);
+    if (blockRapidAdvance) advanceBlockedUntil = performance.now() + 350;
+    showNode(resolve(choice.next));
   }
 
   function applyEffects(effects) {
     const messages = [];
     Object.entries(effects).forEach(([stat, delta]) => {
       const previous = state.stats[stat] || 0;
-      state.stats[stat] = Math.max(0, Math.min(5, previous + delta));
+      const cap = stat === "affection" ? 10 : 5;
+      state.stats[stat] = Math.max(0, Math.min(cap, previous + delta));
       if (delta > 0 && stat === "memory") messages.push("기억 조각이 선명해졌다");
       if (delta > 0 && stat === "trust") messages.push("윤서와의 동조율이 올랐다");
       if (delta > 0 && stat === "courage") messages.push("진실을 마주할 용기를 얻었다");
+      if (delta > 0 && stat === "affection") messages.push("윤서의 호감도가 올랐다");
       if (delta < 0 && stat === "trust") messages.push("윤서와의 거리가 멀어졌다");
     });
     if (messages.length) showToast(messages.join(" · "));
@@ -1791,6 +1896,17 @@
     elements.syncFill.style.width = `${sync}%`;
     const resolve = Math.min(100, (state.stats.courage / 5) * 100);
     elements.resolveFill.style.width = `${resolve}%`;
+    elements.affectionHearts.innerHTML = "";
+    const affection = state.stats.affection || 0;
+    for (let i = 0; i < 5; i += 1) {
+      const heart = document.createElement("i");
+      const threshold = i * 2;
+      heart.textContent = "♥";
+      if (affection >= threshold + 2) heart.className = "is-active";
+      else if (affection === threshold + 1) heart.className = "is-half";
+      elements.affectionHearts.appendChild(heart);
+    }
+    elements.affectionHearts.setAttribute("aria-label", `윤서 호감도 ${affection} / 10`);
   }
 
   function saveGame() {
@@ -1969,6 +2085,8 @@
     }
     if (activeScreen === "game") advanceStory();
   });
+  elements.schedulePanel.addEventListener("click", (event) => event.stopPropagation());
+  elements.phoneMessages.addEventListener("click", (event) => event.stopPropagation());
 
   elements.textSpeed.addEventListener("input", (event) => {
     settings.textSpeed = Number(event.target.value);

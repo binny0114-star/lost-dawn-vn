@@ -367,7 +367,8 @@ button:disabled {
 .chapter-label span,
 .memory-meter > span,
 .sync-meter > span,
-.resolve-meter > span {
+.resolve-meter > span,
+.affection-meter > span {
   color: rgba(198, 228, 237, 0.48);
   font-family: Consolas, monospace;
   font-size: 9px;
@@ -394,7 +395,8 @@ button:disabled {
 
 .memory-meter,
 .sync-meter,
-.resolve-meter {
+.resolve-meter,
+.affection-meter {
   display: grid;
   gap: 7px;
 }
@@ -439,6 +441,35 @@ button:disabled {
 .resolve-track i {
   background: linear-gradient(90deg, #8c5972, var(--warm));
   box-shadow: 0 0 8px rgba(255, 197, 141, 0.55);
+}
+
+.affection-hearts {
+  display: flex;
+  min-width: 78px;
+  gap: 5px;
+  line-height: 1;
+}
+
+.affection-hearts i {
+  color: rgba(255, 170, 194, 0.18);
+  font-size: 16px;
+  font-style: normal;
+  filter: drop-shadow(0 0 0 transparent);
+  transition:
+    color 0.4s,
+    filter 0.4s;
+}
+
+.affection-hearts i.is-active {
+  color: #ff91b8;
+  filter: drop-shadow(0 0 5px rgba(255, 105, 158, 0.72));
+}
+
+.affection-hearts i.is-half {
+  color: transparent;
+  background: linear-gradient(90deg, #ff91b8 50%, rgba(255, 170, 194, 0.18) 50%);
+  background-clip: text;
+  filter: drop-shadow(0 0 4px rgba(255, 105, 158, 0.48));
 }
 
 .hud-actions {
@@ -602,6 +633,197 @@ button:disabled {
   box-shadow: 0 0 7px var(--cyan);
 }
 
+.schedule-panel,
+.phone-panel {
+  position: absolute;
+  z-index: 6;
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 0.35s var(--ease),
+    transform 0.35s var(--ease);
+}
+
+.schedule-panel.is-visible,
+.phone-panel.is-visible {
+  visibility: visible;
+  opacity: 1;
+}
+
+.schedule-panel.is-visible {
+  pointer-events: auto;
+}
+
+.schedule-panel {
+  top: clamp(88px, 13vh, 132px);
+  left: 50%;
+  display: grid;
+  width: min(760px, calc(100% - 48px));
+  padding: 17px 22px;
+  border: 1px solid rgba(101, 230, 239, 0.28);
+  background:
+    linear-gradient(100deg, rgba(8, 29, 45, 0.92), rgba(5, 15, 27, 0.76)),
+    rgba(5, 18, 31, 0.86);
+  box-shadow: 0 18px 54px rgba(0, 0, 0, 0.34);
+  transform: translate(-50%, -10px);
+  backdrop-filter: blur(12px);
+}
+
+.schedule-panel.is-visible {
+  transform: translate(-50%, 0);
+}
+
+.schedule-panel header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.schedule-panel header span,
+.phone-panel header span,
+.phone-panel header small {
+  color: var(--cyan);
+  font-family: Consolas, monospace;
+  font-size: 9px;
+  letter-spacing: 0.18em;
+}
+
+.schedule-panel header strong {
+  font-family: "Nanum Myeongjo", "Batang", serif;
+  font-size: 20px;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+}
+
+.schedule-days {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 7px;
+  margin-top: 13px;
+}
+
+.schedule-days span {
+  position: relative;
+  display: grid;
+  height: 22px;
+  place-items: center;
+  border: 1px solid rgba(154, 207, 221, 0.2);
+  color: rgba(198, 228, 237, 0.36);
+  font-family: Consolas, monospace;
+  font-size: 9px;
+}
+
+.schedule-days span.is-complete {
+  border-color: rgba(255, 145, 184, 0.58);
+  color: #ffd5e3;
+  background: rgba(255, 105, 158, 0.18);
+}
+
+.schedule-days span.is-current {
+  border-color: var(--cyan);
+  color: #fff;
+  box-shadow: inset 0 0 14px rgba(101, 230, 239, 0.16);
+}
+
+.schedule-panel > p {
+  margin: 12px 0 0;
+  color: rgba(231, 246, 249, 0.78);
+  font-family: "Nanum Myeongjo", "Batang", serif;
+  font-size: 13px;
+}
+
+.phone-panel {
+  top: clamp(82px, 12vh, 122px);
+  left: 50%;
+  display: grid;
+  width: min(430px, calc(100% - 36px));
+  min-height: 310px;
+  max-height: min(390px, 48vh);
+  padding: 17px;
+  border: 1px solid rgba(160, 216, 230, 0.36);
+  border-radius: 22px;
+  background:
+    linear-gradient(180deg, rgba(13, 35, 52, 0.98), rgba(4, 13, 24, 0.98)),
+    var(--night);
+  box-shadow:
+    0 26px 80px rgba(0, 0, 0, 0.58),
+    inset 0 0 0 5px rgba(255, 255, 255, 0.025);
+  transform: translate(-50%, 12px);
+}
+
+.phone-panel.is-visible {
+  transform: translate(-50%, 0);
+}
+
+.phone-panel header {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: end;
+  padding: 2px 5px 13px;
+  border-bottom: 1px solid rgba(156, 212, 226, 0.18);
+}
+
+.phone-panel header span {
+  grid-column: 1 / -1;
+  margin-bottom: 7px;
+}
+
+.phone-panel header strong {
+  font-size: 16px;
+  letter-spacing: 0.08em;
+}
+
+.phone-panel header small {
+  color: rgba(198, 228, 237, 0.42);
+  letter-spacing: 0.08em;
+}
+
+.phone-messages {
+  display: flex;
+  min-height: 196px;
+  padding: 15px 4px 8px;
+  overflow-y: auto;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: auto;
+  touch-action: pan-y;
+}
+
+.phone-bubble {
+  width: fit-content;
+  max-width: 82%;
+  margin: 0;
+  padding: 9px 12px;
+  border-radius: 4px 14px 14px;
+  color: rgba(244, 251, 253, 0.94);
+  background: rgba(49, 83, 104, 0.62);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.phone-bubble.is-me {
+  align-self: flex-end;
+  border-radius: 14px 4px 14px 14px;
+  color: #301c27;
+  background: linear-gradient(135deg, #ffd0df, #ff9fc2);
+}
+
+.phone-hint {
+  margin: auto 0 0;
+  color: rgba(198, 228, 237, 0.38);
+  font-family: Consolas, monospace;
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-align: center;
+}
+
+.game-screen[data-mode="message"] .dialogue-box {
+  visibility: hidden;
+  opacity: 0;
+}
+
 .choice-panel {
   position: absolute;
   z-index: 7;
@@ -679,6 +901,77 @@ button:disabled {
   font-family: Consolas, monospace;
   font-size: 9px;
   letter-spacing: 0.08em;
+}
+
+.choice-reward {
+  color: rgba(101, 230, 239, 0.62);
+  font-family: Consolas, monospace;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+
+.choice-panel.is-schedule {
+  top: 51%;
+  grid-template-columns: repeat(3, 1fr);
+  width: min(980px, calc(100% - 48px));
+}
+
+.choice-panel.is-schedule .choice-button {
+  grid-template-columns: 34px 1fr;
+  min-height: 118px;
+  padding: 15px;
+}
+
+.choice-panel.is-schedule .choice-number {
+  align-self: start;
+}
+
+.choice-panel.is-schedule .choice-copy {
+  display: grid;
+  gap: 5px;
+  padding: 0 4px 0 10px;
+}
+
+.choice-panel.is-schedule .choice-copy small {
+  color: rgba(101, 230, 239, 0.52);
+  font-family: Consolas, monospace;
+  font-size: 8px;
+  letter-spacing: 0.12em;
+}
+
+.choice-panel.is-schedule .choice-copy strong {
+  color: #f7fcff;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.choice-panel.is-schedule .choice-copy span {
+  color: rgba(220, 236, 241, 0.62);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.choice-panel.is-schedule .choice-reward {
+  grid-column: 2;
+  padding-left: 10px;
+}
+
+.choice-panel.is-message {
+  top: clamp(430px, 60vh, 540px);
+  bottom: auto;
+  width: min(620px, calc(100% - 36px));
+  transform: translateX(-50%);
+}
+
+.choice-panel.is-message .choice-button {
+  min-height: 48px;
+  background: linear-gradient(90deg, rgba(42, 27, 43, 0.96), rgba(14, 23, 38, 0.96));
+}
+
+.choice-panel.is-message .choice-number {
+  border-color: rgba(255, 145, 184, 0.48);
+  color: #ffb6cf;
 }
 
 .chapter-card {
@@ -1154,7 +1447,28 @@ kbd {
   .status-cluster {
     top: 68px;
     left: 15px;
+    display: grid;
+    grid-template-columns: repeat(2, auto);
+    gap: 9px 18px;
     transform: none;
+  }
+
+  .memory-shard {
+    width: 13px;
+  }
+
+  .sync-track,
+  .resolve-track {
+    width: 62px;
+  }
+
+  .affection-hearts {
+    min-width: 62px;
+    gap: 3px;
+  }
+
+  .affection-hearts i {
+    font-size: 14px;
   }
 
   .dialogue-box {
@@ -1180,6 +1494,72 @@ kbd {
 
   .choice-panel {
     top: 39%;
+  }
+
+  .schedule-panel {
+    top: 132px;
+    width: calc(100% - 20px);
+    padding: 13px 15px;
+  }
+
+  .schedule-panel header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .schedule-panel header strong {
+    font-size: 17px;
+  }
+
+  .schedule-days {
+    margin-top: 9px;
+  }
+
+  .schedule-panel > p {
+    margin-top: 8px;
+    font-size: 12px;
+  }
+
+  .choice-panel.is-schedule {
+    top: 246px;
+    bottom: 220px;
+    grid-template-columns: 1fr;
+    width: calc(100% - 20px);
+    gap: 6px;
+    align-content: center;
+    overflow-y: auto;
+    transform: translateX(-50%);
+  }
+
+  .choice-panel.is-schedule .choice-button {
+    min-height: 64px;
+    padding: 8px 10px;
+  }
+
+  .choice-panel.is-schedule .choice-copy {
+    grid-template-columns: auto 1fr;
+    align-items: baseline;
+    gap: 2px 8px;
+  }
+
+  .choice-panel.is-schedule .choice-copy span {
+    grid-column: 1 / -1;
+  }
+
+  .choice-panel.is-schedule .choice-reward {
+    padding-left: 8px;
+  }
+
+  .phone-panel {
+    top: 102px;
+    min-height: 300px;
+    max-height: 42vh;
+  }
+
+  .choice-panel.is-message {
+    top: 430px;
+    bottom: auto;
   }
 
   .choice-button {
@@ -1266,6 +1646,81 @@ kbd {
     transform: translateX(-50%);
   }
 
+  .schedule-panel {
+    top: 64px;
+    max-height: 112px;
+    padding: 9px 12px;
+    overflow: hidden;
+  }
+
+  .schedule-panel header {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: baseline;
+  }
+
+  .schedule-panel header strong {
+    font-size: 14px;
+  }
+
+  .schedule-days {
+    margin-top: 5px;
+  }
+
+  .schedule-days span {
+    height: 17px;
+  }
+
+  .schedule-panel > p {
+    overflow: hidden;
+    margin-top: 5px;
+    font-size: 10px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .choice-panel.is-schedule {
+    top: 184px;
+    bottom: 172px;
+    align-content: start;
+    overflow-y: auto;
+    transform: translateX(-50%);
+  }
+
+  .choice-panel.is-schedule .choice-button {
+    min-height: 54px;
+  }
+
+  .phone-panel {
+    top: 58px;
+    min-height: 220px;
+    max-height: 232px;
+    padding: 11px;
+  }
+
+  .phone-panel header {
+    padding-bottom: 8px;
+  }
+
+  .phone-messages {
+    min-height: 128px;
+    padding-top: 9px;
+  }
+
+  .phone-bubble {
+    padding: 7px 9px;
+    font-size: 11px;
+  }
+
+  .choice-panel.is-message {
+    top: 300px;
+    bottom: auto;
+    max-height: 218px;
+    align-content: end;
+    overflow-y: auto;
+    transform: translateX(-50%);
+  }
+
   .choice-button {
     min-height: 48px;
     padding-top: 7px;
@@ -1274,6 +1729,129 @@ kbd {
 
   .choice-copy {
     font-size: 13px;
+  }
+}
+
+@media (max-height: 600px) {
+  .game-screen[data-mode="schedule"] .game-hud,
+  .game-screen[data-mode="message"] .game-hud {
+    opacity: 0.16;
+    pointer-events: none;
+  }
+
+  .game-screen[data-mode="schedule"] .dialogue-box {
+    visibility: hidden;
+    opacity: 0;
+  }
+
+  .schedule-panel {
+    top: 8px;
+    right: 10px;
+    left: 10px;
+    width: auto;
+    height: 32vh;
+    max-height: 32vh;
+    padding: 10px 12px;
+    overflow-y: auto;
+    transform: none;
+  }
+
+  .schedule-panel.is-visible {
+    transform: none;
+  }
+
+  .schedule-panel header {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .schedule-panel > p {
+    overflow: visible;
+    white-space: normal;
+  }
+
+  .choice-panel.is-schedule {
+    top: calc(32vh + 16px);
+    right: 10px;
+    bottom: auto;
+    left: 10px;
+    width: auto;
+    height: calc(68vh - 24px);
+    max-height: calc(68vh - 24px);
+    align-content: start;
+    overflow-y: auto;
+    transform: none;
+  }
+
+  .phone-panel {
+    top: 8px;
+    right: 10px;
+    left: 10px;
+    width: auto;
+    height: 45vh;
+    min-height: 0;
+    max-height: 45vh;
+    transform: none;
+  }
+
+  .phone-panel.is-visible {
+    transform: none;
+  }
+
+  .phone-messages {
+    min-height: 0;
+  }
+
+  .choice-panel.is-message {
+    top: calc(45vh + 16px);
+    right: 10px;
+    bottom: auto;
+    left: 10px;
+    width: auto;
+    height: calc(55vh - 24px);
+    max-height: calc(55vh - 24px);
+    align-content: start;
+    overflow-y: auto;
+    transform: none;
+  }
+}
+
+@media (min-width: 520px) and (max-height: 600px) and (min-aspect-ratio: 4 / 3) {
+  .schedule-panel {
+    top: 10px;
+    right: auto;
+    left: 12px;
+    width: 38%;
+    height: auto;
+    max-height: calc(100vh - 20px);
+    padding: 12px;
+  }
+
+  .choice-panel.is-schedule {
+    top: 10px;
+    right: 12px;
+    left: 42%;
+    height: calc(100vh - 20px);
+    max-height: calc(100vh - 20px);
+    align-content: center;
+  }
+
+  .phone-panel {
+    top: 10px;
+    right: auto;
+    left: 12px;
+    width: 46%;
+    height: calc(100vh - 20px);
+    max-height: calc(100vh - 20px);
+  }
+
+  .choice-panel.is-message {
+    top: 10px;
+    right: 12px;
+    left: 50%;
+    height: calc(100vh - 20px);
+    max-height: calc(100vh - 20px);
+    align-content: center;
   }
 }
 

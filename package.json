@@ -2,7 +2,7 @@
   "name": "lost-dawn-vn",
   "version": "1.0.0",
   "private": true,
-  "description": "A short Korean mystery-romance visual novel.",
+  "description": "A Korean mystery romance simulation with a five-date single-heroine route.",
   "scripts": {
     "serve": "node scripts/serve.js",
     "test": "playwright test",
