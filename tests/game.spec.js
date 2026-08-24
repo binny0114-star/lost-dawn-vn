@@ -75,8 +75,8 @@ test.beforeEach(async ({ page }) => {
 test("title screen exposes the game and attribution", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "분실된 새벽" })).toBeVisible();
   await expect(page.locator(".title-kicker")).toContainText("SINGLE-HEROINE ROMANCE SIM");
-  await expect(page.locator('script[src="dating-sim.js?v=6"]')).toHaveCount(1);
-  await expect(page.locator('script[src="game.js?v=6"]')).toHaveCount(1);
+  await expect(page.locator('script[src="dating-sim.js?v=7"]')).toHaveCount(1);
+  await expect(page.locator('script[src="game.js?v=7"]')).toHaveCount(1);
   await expect(page.locator("#affectionHearts")).toHaveAttribute("aria-label", "윤서 호감도 0 / 10");
   await expect(page.getByRole("button", { name: /이어하기/ })).toBeDisabled();
   await expect(page.getByRole("link", { name: "XIAEL" })).toHaveAttribute(
@@ -297,6 +297,7 @@ test("bonus games unlock persistent photos and achievements", async ({ page }) =
   await expect(page.locator(".minigame-result strong")).toHaveText("300");
   await expect(page.locator("#photoReveal")).toHaveClass(/is-visible/);
   await expect(page.locator("#photoReveal")).toHaveAttribute("data-photo-id", "photo-strip");
+  await page.locator("#photoRevealDismiss").click();
 
   let collection = await page.evaluate(() =>
     JSON.parse(window.localStorage.getItem("lost-dawn-collection-v1")),
@@ -315,6 +316,7 @@ test("bonus games unlock persistent photos and achievements", async ({ page }) =
   await expect(page.locator(".minigame-result")).toBeVisible();
   await expect(page.locator("#photoReveal")).toHaveClass(/is-visible/);
   await expect(page.locator("#photoReveal")).toHaveAttribute("data-photo-id", "perfect-shutter");
+  await page.locator("#photoRevealDismiss").click();
 
   collection = await page.evaluate(() =>
     JSON.parse(window.localStorage.getItem("lost-dawn-collection-v1")),
@@ -348,7 +350,9 @@ test("album cards use the supplied illustrations", async ({ page }) => {
   }
 });
 
-test("a newly unlocked story illustration fades out on the next node", async ({ page }) => {
+test("a newly unlocked illustration covers the UI and dismisses without advancing", async ({
+  page,
+}) => {
   await page.evaluate(() => {
     window.sessionStorage.setItem("lost-dawn-test-preserve-save", "true");
     window.localStorage.setItem(
@@ -369,17 +373,53 @@ test("a newly unlocked story illustration fades out on the next node", async ({ 
 
   const reveal = page.locator("#photoReveal");
   await expect(reveal).toHaveClass(/is-visible/);
+  await expect(reveal).toHaveAttribute("aria-hidden", "false");
   await expect(reveal).toHaveAttribute("data-photo-id", "cocoa-pair");
   await expect(page.locator("#photoRevealImage")).toHaveJSProperty("naturalWidth", 1280);
-  const fit = await page.evaluate(() => ({
-    foreground: getComputedStyle(document.querySelector("#photoRevealImage")).objectFit,
-    backdrop: getComputedStyle(document.querySelector("#photoRevealBackdrop")).objectFit,
-  }));
-  expect(fit).toEqual({ foreground: "contain", backdrop: "cover" });
+  const presentation = await page.evaluate(() => {
+    const foreground = document.querySelector("#photoRevealImage");
+    const backdrop = document.querySelector("#photoRevealBackdrop");
+    const dismiss = document.querySelector("#photoRevealDismiss");
+    return {
+      foregroundFit: getComputedStyle(foreground).objectFit,
+      backdropFit: getComputedStyle(backdrop).objectFit,
+      overHud: document.elementFromPoint(window.innerWidth - 24, 24) === dismiss,
+      overDialogue:
+        document.elementFromPoint(window.innerWidth / 2, window.innerHeight - 36) === dismiss,
+      screenOpacity: getComputedStyle(document.querySelector("#gameScreen")).opacity,
+      hintDisplay: getComputedStyle(document.querySelector(".photo-reveal-hint")).display,
+      portrait: window.matchMedia("(orientation: portrait)").matches,
+      revealZ: Number(getComputedStyle(document.querySelector("#photoReveal")).zIndex),
+      hudZ: Number(getComputedStyle(document.querySelector(".game-hud")).zIndex),
+      dialogueZ: Number(getComputedStyle(document.querySelector(".dialogue-box")).zIndex),
+    };
+  });
+  const { hintDisplay, portrait, ...corePresentation } = presentation;
+  expect(hintDisplay).toBe(portrait ? "block" : "none");
+  expect(corePresentation).toEqual({
+    foregroundFit: "contain",
+    backdropFit: "cover",
+    overHud: true,
+    overDialogue: true,
+    screenOpacity: "0",
+    revealZ: 70,
+    hudZ: 5,
+    dialogueZ: 4,
+  });
 
-  await page.evaluate(() => document.querySelector("#gameScreen").click());
-  await page.evaluate(() => document.querySelector("#gameScreen").click());
+  const savedBeforeDismiss = await page.evaluate(() =>
+    JSON.parse(window.localStorage.getItem("lost-dawn-save-v1")),
+  );
+  await page.locator("#photoRevealDismiss").click();
   await expect(reveal).not.toHaveClass(/is-visible/);
+  await expect(reveal).toHaveAttribute("aria-hidden", "true");
+  const savedAfterDismiss = await page.evaluate(() =>
+    JSON.parse(window.localStorage.getItem("lost-dawn-save-v1")),
+  );
+  expect(savedAfterDismiss.node).toBe(savedBeforeDismiss.node);
+  await page.waitForTimeout(380);
+  await page.evaluate(() => document.querySelector("#gameScreen").click());
+  await page.evaluate(() => document.querySelector("#gameScreen").click());
   await expect(page.locator("#speakerName")).toHaveText("한윤서");
 });
 
@@ -418,7 +458,9 @@ test("previously unlocked artwork still appears at its story moment", async ({ p
   expect(collection.achievements).toEqual(["first-breather"]);
 });
 
-test("a cancelled reveal frame cannot restore the previous illustration", async ({ page }) => {
+test("rapid progression cannot skip artwork while its reveal frame is pending", async ({
+  page,
+}) => {
   await page.addInitScript(() => {
     const nativeRequestAnimationFrame = window.requestAnimationFrame.bind(window);
     let heldFrameId = 0;
@@ -460,10 +502,18 @@ test("a cancelled reveal frame cannot restore the previous illustration", async 
 
   await page.evaluate(() => document.querySelector("#gameScreen").click());
   await page.evaluate(() => document.querySelector("#gameScreen").click());
-  await page.evaluate(() => window.__releaseAnimationFrames());
+  let savedState = await page.evaluate(() =>
+    JSON.parse(window.localStorage.getItem("lost-dawn-save-v1")),
+  );
+  expect(savedState.node).toBe("breather01a");
 
-  await expect(page.locator("#speakerName")).toHaveText("한윤서");
-  await expect(page.locator("#photoReveal")).not.toHaveClass(/is-visible/);
+  await page.evaluate(() => window.__releaseAnimationFrames());
+  await expect(page.locator("#photoReveal")).toHaveClass(/is-visible/);
+  await page.locator("#photoRevealDismiss").click();
+  savedState = await page.evaluate(() =>
+    JSON.parse(window.localStorage.getItem("lost-dawn-save-v1")),
+  );
+  expect(savedState.node).toBe("breather01a");
 });
 
 test("restarting cancels pending minigame rewards", async ({ page }) => {

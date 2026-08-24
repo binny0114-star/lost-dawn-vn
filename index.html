@@ -11,18 +11,26 @@
     <meta name="robots" content="noindex, nofollow, noarchive" />
     <title>분실된 새벽 | 02:17 Last Platform</title>
     <link rel="preload" href="assets/characters/yoonseo/neutral.png" as="image" />
-    <link rel="stylesheet" href="styles.css?v=6" />
-    <script src="story-expansion.js?v=6" defer></script>
-    <script src="dating-sim.js?v=6" defer></script>
-    <script src="romance-extras.js?v=6" defer></script>
-    <script src="game.js?v=6" defer></script>
+    <link rel="stylesheet" href="styles.css?v=7" />
+    <script src="story-expansion.js?v=7" defer></script>
+    <script src="dating-sim.js?v=7" defer></script>
+    <script src="romance-extras.js?v=7" defer></script>
+    <script src="game.js?v=7" defer></script>
   </head>
   <body>
     <main id="app" class="app" aria-label="분실된 새벽 연애 시뮬레이션">
       <canvas id="sceneCanvas" aria-hidden="true"></canvas>
-      <div id="photoReveal" class="photo-reveal" aria-hidden="true">
-        <img id="photoRevealBackdrop" class="photo-reveal-backdrop" alt="" />
-        <img id="photoRevealImage" class="photo-reveal-image" alt="" />
+      <div id="photoReveal" class="photo-reveal" role="dialog" aria-modal="true" aria-hidden="true">
+        <button
+          id="photoRevealDismiss"
+          class="photo-reveal-dismiss"
+          type="button"
+          tabindex="-1"
+        >
+          <img id="photoRevealBackdrop" class="photo-reveal-backdrop" alt="" />
+          <img id="photoRevealImage" class="photo-reveal-image" alt="" />
+          <span class="photo-reveal-hint" aria-hidden="true">화면을 눌러 돌아가기</span>
+        </button>
       </div>
       <div class="rain-glass" aria-hidden="true"></div>
       <div class="film-grain" aria-hidden="true"></div>

@@ -14,6 +14,7 @@
     canvas: $("#sceneCanvas"),
     fade: $("#sceneFade"),
     photoReveal: $("#photoReveal"),
+    photoRevealDismiss: $("#photoRevealDismiss"),
     photoRevealBackdrop: $("#photoRevealBackdrop"),
     photoRevealImage: $("#photoRevealImage"),
     titleScreen: $("#titleScreen"),
@@ -804,6 +805,7 @@
   let minigameFrame = 0;
   let minigameTimer = 0;
   let photoRevealRequest = 0;
+  let photoRevealPending = false;
 
   function createInitialState() {
     return {
@@ -1804,6 +1806,11 @@
 
   function advanceStory() {
     if (activeScreen !== "game" || anyModalOpen() || transitioning) return;
+    if (photoRevealPending) return;
+    if (elements.photoReveal.classList.contains("is-visible")) {
+      dismissPhotoReveal();
+      return;
+    }
     if (minigameState) return;
     if (performance.now() < advanceBlockedUntil) return;
     if (typing) {
@@ -1925,9 +1932,29 @@
     };
   }
 
-  function hidePhotoReveal() {
+  function hidePhotoReveal(options = {}) {
     photoRevealRequest += 1;
+    photoRevealPending = false;
+    elements.app.classList.remove("is-photo-reveal-active");
     elements.photoReveal.classList.remove("is-visible");
+    elements.photoReveal.setAttribute("aria-hidden", "true");
+    elements.photoRevealDismiss.tabIndex = -1;
+    if (document.activeElement === elements.photoRevealDismiss) {
+      elements.photoRevealDismiss.blur();
+    }
+    if (options.blockAdvance) {
+      advanceBlockedUntil = Math.max(advanceBlockedUntil, performance.now() + 350);
+    }
+  }
+
+  function dismissPhotoReveal() {
+    if (
+      !photoRevealPending &&
+      !elements.photoReveal.classList.contains("is-visible")
+    ) {
+      return;
+    }
+    hidePhotoReveal({ blockAdvance: true });
   }
 
   function showPhotoReveal(photoId) {
@@ -1938,18 +1965,31 @@
     }
 
     const requestId = ++photoRevealRequest;
+    photoRevealPending = true;
+    elements.app.classList.add("is-photo-reveal-active");
     elements.photoReveal.classList.remove("is-visible");
+    elements.photoReveal.setAttribute("aria-hidden", "true");
+    elements.photoRevealDismiss.tabIndex = -1;
+    elements.photoRevealDismiss.setAttribute(
+      "aria-label",
+      `${photo.title} 그림 닫기`,
+    );
     elements.photoReveal.dataset.photoId = photoId;
     elements.photoRevealBackdrop.src = photo.image;
     elements.photoRevealImage.onload = () => {
       if (requestId !== photoRevealRequest) return;
       requestAnimationFrame(() => {
         if (requestId !== photoRevealRequest) return;
+        photoRevealPending = false;
+        elements.photoReveal.setAttribute("aria-hidden", "false");
+        elements.photoRevealDismiss.tabIndex = 0;
         elements.photoReveal.classList.add("is-visible");
+        elements.photoRevealDismiss.focus({ preventScroll: true });
       });
     };
     elements.photoRevealImage.onerror = () => {
       if (requestId !== photoRevealRequest) return;
+      hidePhotoReveal();
       console.error(`앨범 이미지를 불러오지 못했습니다: ${photo.image}`);
       showToast("앨범 이미지를 불러오지 못했습니다.");
     };
@@ -2436,6 +2476,21 @@
   }
 
   function onKeyDown(event) {
+    const photoRevealVisible = elements.photoReveal.classList.contains("is-visible");
+    if (photoRevealPending || photoRevealVisible) {
+      if (
+        photoRevealVisible &&
+        (event.key === "Escape" || event.key === "Enter" || event.code === "Space")
+      ) {
+        event.preventDefault();
+        dismissPhotoReveal();
+      } else if (photoRevealPending && event.key === "Escape") {
+        event.preventDefault();
+        dismissPhotoReveal();
+      }
+      return;
+    }
+
     if (event.repeat && minigameState) return;
     if (event.key === "m" || event.key === "M") {
       toggleSound();
@@ -2489,6 +2544,10 @@
       return;
     }
     if (activeScreen === "game") advanceStory();
+  });
+  elements.photoRevealDismiss.addEventListener("click", (event) => {
+    event.stopPropagation();
+    dismissPhotoReveal();
   });
   elements.schedulePanel.addEventListener("click", (event) => event.stopPropagation());
   elements.phoneMessages.addEventListener("click", (event) => event.stopPropagation());
