@@ -1,7 +1,7 @@
 const { test, expect } = require("@playwright/test");
 
 const PRE_DATE_ROUTE = [0, 2, 2, 0, 0, 2, 2];
-const DATE_ROUTE = [0, 0, 0, 1, 0, 2, 2, 0, 1, 0, 0, 0, 1, 0, 2];
+const DATE_ROUTE = [0, 0, 0, 1, 0, 2, 1, 2, 0, 1, 0, 0, 0, 1, 1, 0, 2];
 const POST_DATE_ROUTE = [2, 0, 0, 2, 0, 0, 2, 1, 2, 0, 2];
 const TRUE_ROUTE_PREFIX = [...PRE_DATE_ROUTE, ...DATE_ROUTE, ...POST_DATE_ROUTE];
 const PHOTO_IDS = [
@@ -75,8 +75,8 @@ test.beforeEach(async ({ page }) => {
 test("title screen exposes the game and attribution", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "분실된 새벽" })).toBeVisible();
   await expect(page.locator(".title-kicker")).toContainText("SINGLE-HEROINE ROMANCE SIM");
-  await expect(page.locator('script[src="dating-sim.js?v=7"]')).toHaveCount(1);
-  await expect(page.locator('script[src="game.js?v=7"]')).toHaveCount(1);
+  await expect(page.locator('script[src="dating-sim.js?v=8"]')).toHaveCount(1);
+  await expect(page.locator('script[src="game.js?v=8"]')).toHaveCount(1);
   await expect(page.locator("#affectionHearts")).toHaveAttribute("aria-label", "윤서 호감도 0 / 10");
   await expect(page.getByRole("button", { name: /이어하기/ })).toBeDisabled();
   await expect(page.getByRole("link", { name: "XIAEL" })).toHaveAttribute(
@@ -235,6 +235,237 @@ test("the schedule, date, and message loop raises persistent affection", async (
   await expect(page.locator("#chapterName")).toHaveText("보내지 못한 여름");
 });
 
+test("station anomalies vary by run, persist, and never repeat in one route", async ({
+  page,
+}) => {
+  const anomalyIds = [
+    "wrong-summer",
+    "crossed-voice",
+    "duplicate-ticket",
+    "missing-minute",
+  ];
+  let firstSequence;
+
+  for (let index = 0; index < anomalyIds.length; index += 1) {
+    const variationSeed = index + 4;
+    await page.evaluate((seed) => {
+      window.sessionStorage.setItem("lost-dawn-test-preserve-save", "true");
+      window.localStorage.setItem(
+        "lost-dawn-save-v1",
+        JSON.stringify({
+          node: "stationAnomaly01",
+          chapter: "romance",
+          stats: { memory: 2, trust: 2, courage: 2, affection: 2 },
+          flags: {},
+          minigames: {},
+          variations: {},
+          variationSeed: seed,
+          history: [],
+          storyVersion: 4,
+        }),
+      );
+    }, variationSeed);
+    await page.reload();
+    await page.getByRole("button", { name: /이어하기/ }).click();
+    await playRoute(page, []);
+
+    const savedState = await page.evaluate(() =>
+      JSON.parse(window.localStorage.getItem("lost-dawn-save-v1")),
+    );
+    const sequence = savedState.variations.stationAnomalies;
+    expect(savedState.node).toBe(`stationAnomaly01_${anomalyIds[index]}`);
+    expect(sequence[0]).toBe(anomalyIds[index]);
+    expect(new Set(sequence).size).toBe(2);
+    await expect(page.locator(".choice-button")).toHaveCount(3);
+    if (index === 0) firstSequence = sequence;
+  }
+
+  await page.evaluate((sequence) => {
+    const saved = JSON.parse(window.localStorage.getItem("lost-dawn-save-v1"));
+    saved.node = "stationAnomaly01";
+    saved.variationSeed = 4;
+    saved.variations.stationAnomalies = sequence;
+    window.sessionStorage.setItem("lost-dawn-test-preserve-save", "true");
+    window.localStorage.setItem("lost-dawn-save-v1", JSON.stringify(saved));
+  }, firstSequence);
+  await page.reload();
+  await page.getByRole("button", { name: /이어하기/ }).click();
+  await playRoute(page, []);
+
+  const reloadedState = await page.evaluate(() =>
+    JSON.parse(window.localStorage.getItem("lost-dawn-save-v1")),
+  );
+  expect(reloadedState.variations.stationAnomalies).toEqual(firstSequence);
+  expect(reloadedState.node).toBe(`stationAnomaly01_${firstSequence[0]}`);
+});
+
+test("legacy saves catch up on missed anomalies before resuming", async ({ page }) => {
+  for (const scenario of [
+    { node: "dateSchedule03", expectedSlots: 1 },
+    { node: "dateSchedule05", expectedSlots: 2 },
+  ]) {
+    await page.evaluate((current) => {
+      window.sessionStorage.setItem("lost-dawn-test-preserve-save", "true");
+      window.localStorage.setItem(
+        "lost-dawn-save-v1",
+        JSON.stringify({
+          node: current.node,
+          chapter: "romance",
+          stats: { memory: 2, trust: 2, courage: 2, affection: 4 },
+          flags: {},
+          minigames: {},
+          history: [],
+          startedAt: 1234,
+          storyVersion: 3,
+        }),
+      );
+    }, scenario);
+    await page.reload();
+    await page.getByRole("button", { name: /이어하기/ }).click();
+    await expect(page.locator("#dialogueText")).toContainText("주인 없는 기억");
+
+    const migratedState = await page.evaluate(() =>
+      JSON.parse(window.localStorage.getItem("lost-dawn-save-v1")),
+    );
+    expect(migratedState.node).toBe("stationAnomaly01");
+    expect(migratedState.variations.legacyAnomalyCatchUp).toEqual({
+      pending: Array.from({ length: scenario.expectedSlots }, (_, index) => index + 1),
+      resumeNode: scenario.node,
+    });
+
+    const result = await playRoute(page, Array(scenario.expectedSlots).fill(0));
+    expect(result).toEqual(
+      expect.objectContaining({
+        choiceIndex: scenario.expectedSlots,
+        stoppedAtChoice: true,
+      }),
+    );
+
+    const resumedState = await page.evaluate(() =>
+      JSON.parse(window.localStorage.getItem("lost-dawn-save-v1")),
+    );
+    expect(resumedState.node).toBe(scenario.node);
+    expect(resumedState.variations.legacyAnomalyCatchUp).toBeUndefined();
+  }
+});
+
+test("risky anomaly choices reward preparation and punish an early gamble", async ({
+  page,
+}) => {
+  for (const scenario of [
+    {
+      anomaly: "duplicate-ticket",
+      courage: 2,
+      expected: { memory: 1, trust: 1, courage: 2 },
+      result: "순서보다 합의가 먼저였다.",
+      label: /RESOLVE 60% 권장/,
+    },
+    {
+      anomaly: "duplicate-ticket",
+      courage: 3,
+      expected: { memory: 2, trust: 3, courage: 4 },
+      result: "그건 좀 멋있었다.",
+      label: /RESOLVE 60% 권장/,
+    },
+    {
+      anomaly: "crossed-voice",
+      courage: 2,
+      trust: 2,
+      expected: { memory: 1, trust: 1, courage: 2 },
+      result: "아직은 둘을 동시에 붙잡기 어려웠다.",
+      label: /SYNC 60% 권장/,
+    },
+    {
+      anomaly: "crossed-voice",
+      courage: 2,
+      trust: 3,
+      expected: { memory: 2, trust: 4, courage: 3 },
+      result: "두 목소리가 하나의 파형이 됐다.",
+      label: /SYNC 60% 권장/,
+    },
+  ]) {
+    await page.evaluate((current) => {
+      window.sessionStorage.setItem("lost-dawn-test-preserve-save", "true");
+      window.localStorage.setItem(
+        "lost-dawn-save-v1",
+        JSON.stringify({
+          node: "stationAnomaly01",
+          chapter: "romance",
+          stats: {
+            memory: 1,
+            trust: current.trust || 2,
+            courage: current.courage,
+            affection: 2,
+          },
+          flags: {},
+          minigames: {},
+          variations: {
+            stationAnomalies: [
+              current.anomaly,
+              current.anomaly === "duplicate-ticket" ? "missing-minute" : "wrong-summer",
+            ],
+          },
+          variationSeed: 6,
+          history: [],
+          storyVersion: 4,
+        }),
+      );
+    }, scenario);
+    await page.reload();
+    await page.getByRole("button", { name: /이어하기/ }).click();
+    await playRoute(page, []);
+    await page.getByRole("button", { name: scenario.label }).click();
+    await expect(page.locator("#dialogueText")).toContainText(scenario.result);
+
+    const savedState = await page.evaluate(() =>
+      JSON.parse(window.localStorage.getItem("lost-dawn-save-v1")),
+    );
+    expect(savedState.stats).toEqual(expect.objectContaining(scenario.expected));
+  }
+});
+
+test("long anomaly choices remain reachable on a compact phone", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 540 });
+  await page.evaluate(() => {
+    window.sessionStorage.setItem("lost-dawn-test-preserve-save", "true");
+    window.localStorage.setItem(
+      "lost-dawn-save-v1",
+      JSON.stringify({
+        node: "stationAnomaly01",
+        chapter: "romance",
+        stats: { memory: 2, trust: 2, courage: 2, affection: 2 },
+        flags: {},
+        minigames: {},
+        variations: {
+          stationAnomalies: ["missing-minute", "wrong-summer"],
+        },
+        variationSeed: 7,
+        history: [],
+        storyVersion: 4,
+      }),
+    );
+  });
+  await page.reload();
+  await page.getByRole("button", { name: /이어하기/ }).click();
+  await playRoute(page, []);
+
+  const lastChoice = page.locator(".choice-button").last();
+  await lastChoice.scrollIntoViewIfNeeded();
+  const layout = await page.evaluate(() => {
+    const choice = document.querySelector(".choice-button:last-child").getBoundingClientRect();
+    const dialogue = document.querySelector(".dialogue-box").getBoundingClientRect();
+    return {
+      choiceTop: choice.top,
+      choiceBottom: choice.bottom,
+      dialogueTop: dialogue.top,
+      viewportHeight: window.innerHeight,
+    };
+  });
+  expect(layout.choiceTop).toBeGreaterThanOrEqual(0);
+  expect(layout.choiceBottom).toBeLessThanOrEqual(layout.dialogueTop);
+  expect(layout.choiceBottom).toBeLessThanOrEqual(layout.viewportHeight);
+});
+
 test("affection-only replies update the accessible meter without a visual notice", async ({
   page,
 }) => {
@@ -249,7 +480,7 @@ test("affection-only replies update the accessible meter without a visual notice
         flags: {},
         minigames: {},
         history: [],
-        storyVersion: 3,
+        storyVersion: 4,
       }),
     );
   });
@@ -279,7 +510,7 @@ test("bonus games unlock persistent photos and achievements", async ({ page }) =
           flags: {},
           minigames: {},
           history: [],
-          storyVersion: 3,
+          storyVersion: 4,
         }),
       );
     }, node);
@@ -364,7 +595,7 @@ test("a newly unlocked illustration covers the UI and dismisses without advancin
         flags: {},
         minigames: {},
         history: [],
-        storyVersion: 3,
+        storyVersion: 4,
       }),
     );
   });
@@ -435,7 +666,7 @@ test("previously unlocked artwork still appears at its story moment", async ({ p
         flags: {},
         minigames: {},
         history: [],
-        storyVersion: 3,
+        storyVersion: 4,
       }),
     );
     window.localStorage.setItem(
@@ -489,7 +720,7 @@ test("rapid progression cannot skip artwork while its reveal frame is pending", 
         flags: {},
         minigames: {},
         history: [],
-        storyVersion: 3,
+        storyVersion: 4,
       }),
     );
   });
@@ -528,7 +759,7 @@ test("restarting cancels pending minigame rewards", async ({ page }) => {
         flags: {},
         minigames: {},
         history: [],
-        storyVersion: 3,
+        storyVersion: 4,
       }),
     );
   });
@@ -563,7 +794,7 @@ test("held keys do not auto-complete minigame rounds", async ({ page }) => {
         flags: {},
         minigames: {},
         history: [],
-        storyVersion: 3,
+        storyVersion: 4,
       }),
     );
   });
@@ -780,7 +1011,7 @@ test("the survivor-guilt choice states its meaning clearly", async ({ page }) =>
         flags: {},
         minigames: {},
         history: [],
-        storyVersion: 3,
+        storyVersion: 4,
       }),
     );
   });
@@ -974,7 +1205,7 @@ test("the final recovery choice stays above dialogue on a short-wide screen", as
           flags: {},
           minigames: {},
           history: [],
-          storyVersion: 3,
+          storyVersion: 4,
         }),
       );
     });
@@ -1015,7 +1246,7 @@ test("the final recovery choices stay below mobile status meters", async ({ page
         flags: {},
         minigames: {},
         history: [],
-        storyVersion: 3,
+        storyVersion: 4,
       }),
     );
   });

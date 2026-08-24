@@ -5,7 +5,7 @@
   const SETTINGS_KEY = "lost-dawn-settings-v1";
   const ENDINGS_KEY = "lost-dawn-endings-v1";
   const COLLECTION_KEY = "lost-dawn-collection-v1";
-  const STORY_VERSION = 3;
+  const STORY_VERSION = 4;
   const ENDING_ORDER = ["memory", "oblivion", "keeper", "dawn"];
 
   const $ = (selector) => document.querySelector(selector);
@@ -807,6 +807,15 @@
   let photoRevealRequest = 0;
   let photoRevealPending = false;
 
+  function createVariationSeed() {
+    const values = new Uint32Array(1);
+    if (window.crypto?.getRandomValues) {
+      window.crypto.getRandomValues(values);
+      if (values[0]) return values[0];
+    }
+    return ((Date.now() ^ Math.floor(performance.now() * 1000)) >>> 0) || 1;
+  }
+
   function createInitialState() {
     return {
       node: "p01",
@@ -814,6 +823,8 @@
       stats: { memory: 0, trust: 0, courage: 0, affection: 0 },
       flags: {},
       minigames: {},
+      variations: {},
+      variationSeed: createVariationSeed(),
       history: [],
       startedAt: Date.now(),
       storyVersion: STORY_VERSION,
@@ -826,12 +837,28 @@
       stats: { ...(saved.stats || {}) },
       flags: { ...(saved.flags || {}) },
       minigames: { ...(saved.minigames || {}) },
+      variations:
+        saved.variations && typeof saved.variations === "object"
+          ? { ...saved.variations }
+          : {},
+      variationSeed:
+        (Number(saved.variationSeed) >>> 0) ||
+        (Number(saved.startedAt) >>> 0) ||
+        1,
       storyVersion: STORY_VERSION,
     };
     const stats = migrated.stats;
     const savedVersion = Number(saved.storyVersion) || 1;
     const isLegacyFinale = ["f01", "f02", "f03", "f04"].includes(saved.node);
     const passedDatingLoop = /^(m|summer|t|r|f|em|eo|ek|ed)/.test(saved.node);
+    const passedSecondAnomaly =
+      passedDatingLoop ||
+      /^(dateSchedule05|date05_|dateMessage05|breather05|dateOutro)/.test(saved.node);
+    const passedFirstAnomaly =
+      passedSecondAnomaly ||
+      /^(dateSchedule0[34]|date0[34]_|dateMessage0[34]|breather03|bonusShutter)/.test(
+        saved.node,
+      );
 
     if (
       !saved.storyVersion &&
@@ -845,6 +872,14 @@
 
     if (savedVersion < 3 && passedDatingLoop && typeof stats.affection !== "number") {
       stats.affection = 7;
+    }
+
+    if (savedVersion === 3 && passedFirstAnomaly) {
+      migrated.variations.legacyAnomalyCatchUp = {
+        pending: passedSecondAnomaly ? [1, 2] : [1],
+        resumeNode: saved.node,
+      };
+      migrated.node = "stationAnomaly01";
     }
 
     return migrated;
@@ -1895,11 +1930,14 @@
   function selectChoice(choice) {
     if (choice.require && !choice.require(state)) return;
     const blockRapidAdvance = currentNode?.mode === "message";
+    const outcome = choice.outcome ? choice.outcome(state) : null;
+    const effects = outcome?.effects || resolve(choice.effects || {}) || {};
+    const flags = outcome?.flags || resolve(choice.flags);
     state.history.push({ speaker: "선택", text: choice.text, choice: true });
-    applyEffects(choice.effects || {});
+    applyEffects(effects);
     if (choice.flag) state.flags[choice.flag] = true;
-    if (Array.isArray(choice.flags)) {
-      choice.flags.forEach((flag) => {
+    if (Array.isArray(flags)) {
+      flags.forEach((flag) => {
         state.flags[flag] = true;
       });
     }
