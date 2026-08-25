@@ -74,12 +74,12 @@ test.beforeEach(async ({ page }) => {
 
 test("title screen exposes the game and attribution", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "분실된 새벽" })).toBeVisible();
-  await expect(page.locator(".title-kicker")).toContainText("SINGLE-HEROINE ROMANCE SIM");
-  await expect(page.locator('script[src="dating-sim.js?v=8"]')).toHaveCount(1);
-  await expect(page.locator('script[src="game.js?v=8"]')).toHaveCount(1);
+  await expect(page.locator(".title-kicker")).toContainText("다섯 번의 데이트");
+  await expect(page.locator('script[src="dating-sim.js?v=9"]')).toHaveCount(1);
+  await expect(page.locator('script[src="game.js?v=9"]')).toHaveCount(1);
   await expect(page.locator("#affectionHearts")).toHaveAttribute("aria-label", "윤서 호감도 0 / 10");
   await expect(page.getByRole("button", { name: /이어하기/ })).toBeDisabled();
-  await expect(page.getByRole("link", { name: "XIAEL" })).toHaveAttribute(
+  await expect(page.getByRole("link", { name: "Xiael" })).toHaveAttribute(
     "href",
     "https://xiael.itch.io/tia-sprite",
   );
@@ -193,8 +193,8 @@ test("the schedule, date, and message loop raises persistent affection", async (
     stoppedAtChoice: true,
   });
   await expect(page.locator("#schedulePanel")).toHaveClass(/is-visible/);
-  await expect(page.locator("#schedulePhase")).toHaveText("MEMORY DATE 01 / 05");
-  await expect(page.locator("#chapterNumber")).toHaveText("CHAPTER 02");
+  await expect(page.locator("#schedulePhase")).toHaveText("5일 중 1일 차");
+  await expect(page.locator("#chapterNumber")).toHaveText("2장");
   await expect(page.locator("#chapterName")).toHaveText("다시 만나는 5일");
   await expect(page.locator("#choicePanel")).toHaveClass(/is-schedule/);
   await expect(page.locator(".choice-button")).toHaveCount(3);
@@ -224,14 +224,14 @@ test("the schedule, date, and message loop raises persistent affection", async (
   await page.waitForTimeout(400);
   const nextSchedule = await playRoute(page, []);
   expect(nextSchedule).toEqual({ choiceIndex: 0, stoppedAtChoice: true });
-  await expect(page.locator("#schedulePhase")).toHaveText("MEMORY DATE 02 / 05");
+  await expect(page.locator("#schedulePhase")).toHaveText("5일 중 2일 차");
   const advancedState = await page.evaluate(() =>
     JSON.parse(window.localStorage.getItem("lost-dawn-save-v1")),
   );
   expect(advancedState.node).toBe("dateSchedule02");
 
   await playRoute(page, DATE_ROUTE.slice(3));
-  await expect(page.locator("#chapterNumber")).toHaveText("CHAPTER 03");
+  await expect(page.locator("#chapterNumber")).toHaveText("3장");
   await expect(page.locator("#chapterName")).toHaveText("보내지 못한 여름");
 });
 
@@ -1109,19 +1109,47 @@ test("dating choices remain scroll-reachable at compact breakpoint edges", async
   }
 });
 
-test("the preferred-date hint stays visible near the portrait breakpoint", async ({ page }) => {
-  await page.setViewportSize({ width: 360, height: 671 });
-  await page.getByRole("button", { name: /처음부터/ }).click();
-  await expect(page.locator("#gameScreen")).toHaveClass(/is-active/);
-  await playRoute(page, PRE_DATE_ROUTE);
+test("the mobile schedule stays below its hint and inside the viewport", async ({ page }) => {
+  test.setTimeout(60_000);
 
-  const layout = await page.evaluate(() => {
-    const hint = document.querySelector("#scheduleHint").getBoundingClientRect();
-    const firstChoice = document.querySelector(".choice-button").getBoundingClientRect();
-    return { hintBottom: hint.bottom, firstChoiceTop: firstChoice.top };
-  });
+  for (const viewport of [
+    { width: 360, height: 671 },
+    { width: 375, height: 667 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.goto("/");
+    await page.getByRole("button", { name: /처음부터/ }).click();
+    await expect(page.locator("#gameScreen")).toHaveClass(/is-active/);
+    await playRoute(page, PRE_DATE_ROUTE);
 
-  expect(layout.firstChoiceTop).toBeGreaterThanOrEqual(layout.hintBottom + 8);
+    const layout = await page.evaluate(() => {
+      const hint = document.querySelector("#scheduleHint").getBoundingClientRect();
+      const firstChoice = document.querySelector(".choice-button").getBoundingClientRect();
+      const choices = document.querySelector("#choicePanel").getBoundingClientRect();
+      return {
+        hintBottom: hint.bottom,
+        firstChoiceTop: firstChoice.top,
+        choicesLeft: choices.left,
+        choicesRight: choices.right,
+        viewportWidth: window.innerWidth,
+      };
+    });
+
+    expect(layout.firstChoiceTop).toBeGreaterThanOrEqual(layout.hintBottom + 8);
+    expect(layout.choicesLeft).toBeGreaterThanOrEqual(0);
+    expect(layout.choicesRight).toBeLessThanOrEqual(layout.viewportWidth);
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const lastChoice = document
+            .querySelector(".choice-button:last-child")
+            .getBoundingClientRect();
+          const dialogue = document.querySelector(".dialogue-box").getBoundingClientRect();
+          return lastChoice.bottom - dialogue.top;
+        }),
+      )
+      .toBeLessThanOrEqual(-8);
+  }
 });
 
 test("compact phone messages can be scrolled without advancing", async ({ page }) => {

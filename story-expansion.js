@@ -4,12 +4,12 @@
   // Extends the original route while preserving existing node IDs for old saves.
   function apply(story, chapters, endings, line) {
     Object.assign(chapters, {
-      prologue: { number: "PROLOGUE", name: "막차" },
-      one: { number: "CHAPTER 01", name: "유실물 보관소" },
-      two: { number: "CHAPTER 02", name: "보내지 못한 여름" },
-      three: { number: "CHAPTER 03", name: "사라진 1분" },
-      four: { number: "CHAPTER 04", name: "유실역의 규칙" },
-      five: { number: "FINAL CHAPTER", name: "오전 2시 18분" },
+      prologue: { number: "프롤로그", name: "막차" },
+      one: { number: "1장", name: "유실물 보관소" },
+      two: { number: "2장", name: "보내지 못한 여름" },
+      three: { number: "3장", name: "사라진 1분" },
+      four: { number: "4장", name: "유실역의 규칙" },
+      five: { number: "마지막 장", name: "오전 2시 18분" },
     });
 
     Object.assign(endings, {

@@ -51,6 +51,7 @@
     minigameControls: $("#minigameControls"),
     speakerName: $("#speakerName"),
     speakerEn: $("#speakerEn"),
+    dialogueBox: $("#dialogueBox"),
     dialogueText: $("#dialogueText"),
     continueMark: $("#continueMark"),
     choicePanel: $("#choicePanel"),
@@ -77,10 +78,10 @@
   };
 
   const chapters = {
-    prologue: { number: "PROLOGUE", name: "막차" },
-    one: { number: "CHAPTER 01", name: "유실물 보관소" },
-    two: { number: "CHAPTER 02", name: "기억의 승강장" },
-    three: { number: "CHAPTER 03", name: "오전 2시 18분" },
+    prologue: { number: "프롤로그", name: "막차" },
+    one: { number: "1장", name: "유실물 보관소" },
+    two: { number: "2장", name: "기억의 승강장" },
+    three: { number: "3장", name: "오전 2시 18분" },
   };
 
   const endings = {
@@ -1005,6 +1006,102 @@
     }
   }
 
+  /**
+   * Painted backdrop per story scene id. Every id the story can hand to
+   * `renderer.setScene` is listed here: title, train, platform, office, memory,
+   * tunnel and dawn.
+   *
+   * `weather` is the single semantic switch that decides atmosphere. It is authored
+   * per scene, never inferred from palette or time of day, so carriage interiors
+   * ("interior") and the underground walk ("underground") can never receive rain
+   * even though they are dark, cold and part of the same rainy night.
+   *
+   *   rain        – water is falling in this shot
+   *   drizzle     – the storm relenting; a thinner fall of the same water
+   *   interior    – 막차 / 일반 기차 안 / 유실물 보관소. Never rains. Never.
+   *   underground – below the platforms; never rains
+   *
+   * `rainBand` marks a *roofed* rain scene: the platform has a canopy overhead,
+   * so the fall is only visible through the open track well between the soffit
+   * and the platform edge. Its presence also suppresses the near pass and the
+   * lens beading, both of which would put water in front of a sheltered camera.
+   * Values are fractions of viewport height; every painting is far wider than
+   * the viewport, so cover-fit resolves the vertical axis 1:1 and the band lands
+   * where it was authored on phones and desktops alike.
+   *
+   * `focus` is the crop anchor (0–1) used when the art is cover-fitted to a
+   * viewport whose aspect differs from the painting, so the meaningful part of
+   * each scene survives on tall phone screens.
+   */
+  const SCENE_ART = {
+    // 메인.jpg — open trackside platform, the sky doing the work on the left.
+    title: {
+      src: "assets/backgrounds/platform-night.jpg",
+      weather: "rain",
+      rain: 0.85,
+      wet: 0.7,
+      focus: [0.62, 0.5],
+    },
+    // 승강장.jpg — 유실로 station, 02:17 on the board, canopy overhead.
+    platform: {
+      src: "assets/backgrounds/lost-platform.jpg",
+      weather: "rain",
+      rain: 0.9,
+      wet: 0.75,
+      rainBand: [0.08, 0.63],
+      focus: [0.5, 0.5],
+    },
+    // Same platform, first light. The storm has thinned but not stopped.
+    dawn: {
+      src: "assets/backgrounds/lost-platform.jpg",
+      weather: "drizzle",
+      rain: 0.32,
+      wet: 0.45,
+      rainBand: [0.08, 0.63],
+      focus: [0.5, 0.5],
+      grade: "dawn",
+    },
+    // 막차.jpg — the last carriage the prologue rides in.
+    train: {
+      src: "assets/backgrounds/last-train.jpg",
+      weather: "interior",
+      focus: [0.56, 0.5],
+    },
+    // 일반 기차 안.jpg — the ordinary commute the memories replay.
+    memory: {
+      src: "assets/backgrounds/night-carriage.jpg",
+      weather: "interior",
+      focus: [0.5, 0.5],
+      grade: "memory",
+    },
+    // 유실물 보관소.jpg — the lost & found counter under its pendant lamp.
+    office: {
+      src: "assets/backgrounds/lost-and-found.jpg",
+      weather: "interior",
+      focus: [0.5, 0.52],
+    },
+    // No painting was delivered for the flooded service tunnel, so it keeps the
+    // hand-drawn set. Deliberately the only vector scene left.
+    tunnel: { src: null, weather: "underground", focus: [0.5, 0.5] },
+  };
+
+  const RAIN_LAYERS = [
+    // Far curtain: short, slow, barely there. Reads as depth, not as drops.
+    { count: 132, len: [13, 26], speed: [360, 520], width: 1, alpha: [0.045, 0.1], front: false },
+    // Mid body: the rain you actually notice.
+    { count: 78, len: [30, 58], speed: [700, 960], width: 1.35, alpha: [0.09, 0.17], front: false },
+    // Near pass: long, fast, drawn in front of the character so she sits inside the weather.
+    { count: 28, len: [78, 152], speed: [1380, 1900], width: 2.4, alpha: [0.12, 0.22], front: true },
+  ];
+
+  // Deterministic hash so drop layout is stable across reloads without storing RNG state.
+  const noise = (n) => {
+    const value = Math.sin(n * 127.1 + 311.7) * 43758.5453;
+    return value - Math.floor(value);
+  };
+
+  const lerp = (a, b, k) => a + (b - a) * k;
+
   class SceneRenderer {
     constructor(canvas) {
       this.canvas = canvas;
@@ -1017,6 +1114,28 @@
       this.emotion = "neutral";
       this.targetScene = "title";
       this.startTime = performance.now();
+      this.art = SCENE_ART.title;
+      elements.app.dataset.weather = this.art.weather;
+      elements.app.dataset.roof = this.art.rainBand ? "true" : "false";
+      this.backdrops = new Map();
+      this.supportsFilter = "filter" in this.ctx;
+      this.motionQuery =
+        typeof window.matchMedia === "function"
+          ? window.matchMedia("(prefers-reduced-motion: reduce)")
+          : null;
+      this.calm = Boolean(this.motionQuery && this.motionQuery.matches);
+      if (this.motionQuery) {
+        const onMotionChange = (event) => {
+          this.calm = event.matches;
+        };
+        if (typeof this.motionQuery.addEventListener === "function") {
+          this.motionQuery.addEventListener("change", onMotionChange);
+        } else if (typeof this.motionQuery.addListener === "function") {
+          this.motionQuery.addListener(onMotionChange);
+        }
+      }
+      this.buildWeather();
+      this.requestBackdrop(this.art);
       this.characterSprites = {};
       this.spriteLoadFailures = new Set();
       ["neutral", "soft", "sad", "smile", "surprised", "shy", "cry"].forEach((emotion) => {
@@ -1040,12 +1159,67 @@
       window.addEventListener("resize", this.resize);
       this.resize();
       requestAnimationFrame(this.render);
+      // Warm the remaining paintings once the first scene is on screen.
+      window.setTimeout(() => {
+        Object.values(SCENE_ART).forEach((art) => this.requestBackdrop(art));
+      }, 900);
+    }
+
+    buildWeather() {
+      this.rainDrops = RAIN_LAYERS.map((layer, layerIndex) =>
+        Array.from({ length: layer.count }, (_, i) => {
+          const seed = layerIndex * 977 + i * 13;
+          return {
+            x: noise(seed),
+            y: noise(seed + 1),
+            len: lerp(layer.len[0], layer.len[1], noise(seed + 2)),
+            speed: lerp(layer.speed[0], layer.speed[1], noise(seed + 3)),
+          };
+        }),
+      );
+      this.splashes = Array.from({ length: 20 }, (_, i) => ({
+        x: noise(i * 31 + 5),
+        depth: noise(i * 31 + 6),
+        period: lerp(1.5, 3.4, noise(i * 31 + 7)),
+        offset: noise(i * 31 + 8) * 3.4,
+        size: lerp(9, 26, noise(i * 31 + 9)),
+      }));
+      this.beads = Array.from({ length: 9 }, (_, i) => ({
+        x: noise(i * 71 + 2),
+        y: noise(i * 71 + 3),
+        r: lerp(1.6, 4.2, noise(i * 71 + 4)),
+        period: lerp(7, 16, noise(i * 71 + 5)),
+        offset: noise(i * 71 + 6) * 16,
+        drift: lerp(-0.02, 0.02, noise(i * 71 + 7)),
+      }));
+    }
+
+    requestBackdrop(art) {
+      if (!art || !art.src || this.backdrops.has(art.src)) return;
+      const image = new Image();
+      image.decoding = "async";
+      image.addEventListener("error", () => {
+        console.error(`배경 이미지를 불러오지 못했습니다: ${art.src}`);
+      });
+      image.src = art.src;
+      this.backdrops.set(art.src, image);
+    }
+
+    ready(art) {
+      if (!art || !art.src) return null;
+      const image = this.backdrops.get(art.src);
+      return image && image.complete && image.naturalWidth > 0 ? image : null;
     }
 
     setScene(scene, character, emotion = "neutral") {
       this.scene = scene;
       this.character = character;
       this.emotion = emotion;
+      this.art = SCENE_ART[scene] || SCENE_ART.title;
+      this.requestBackdrop(this.art);
+      // Lets CSS tune the glass, vignette and lamp warmth to the same scene semantics.
+      elements.app.dataset.weather = this.art.weather;
+      elements.app.dataset.roof = this.art.rainBand ? "true" : "false";
     }
 
     resize() {
@@ -1062,20 +1236,265 @@
       ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
       ctx.clearRect(0, 0, this.width, this.height);
 
+      const t = (timestamp - this.startTime) / 1000;
+      const art = this.art || SCENE_ART.title;
+      const painted = this.drawBackdrop(ctx, art, t);
+
       const scale = Math.max(this.width / 1600, this.height / 900);
       const offsetX = (this.width - 1600 * scale) / 2;
       const offsetY = (this.height - 900 * scale) / 2;
+
+      // Painted art replaces the procedural set; the vector scenes stay as the
+      // fallback for `tunnel` and for the moment before a painting decodes.
+      if (!painted) {
+        ctx.save();
+        ctx.translate(offsetX, offsetY);
+        ctx.scale(scale, scale);
+        this.drawScene(ctx, t);
+        ctx.restore();
+      }
+
+      const rain = this.rainStrength(art);
+      if (rain > 0) this.drawRain(ctx, t, art, rain, false);
+
+      if (this.character === "seo") {
+        ctx.save();
+        ctx.translate(offsetX, offsetY);
+        ctx.scale(scale, scale);
+        this.drawSeo(ctx, t, this.emotion);
+        ctx.restore();
+      }
+
+      if (rain > 0) {
+        this.drawRain(ctx, t, art, rain, true);
+        if (art.wet) this.drawWetGround(ctx, t, art, rain);
+        // Beading belongs on a lens that is actually out in the weather, so a
+        // roofed platform never gets it.
+        if (art.weather === "rain" && !art.rainBand && !this.calm) {
+          this.drawGlassBeads(ctx, t, rain);
+        }
+      }
+
       ctx.save();
       ctx.translate(offsetX, offsetY);
       ctx.scale(scale, scale);
-
-      const t = (timestamp - this.startTime) / 1000;
-      this.drawScene(ctx, t);
-      if (this.character === "seo") this.drawSeo(ctx, t, this.emotion);
       this.drawAtmosphere(ctx, t);
       ctx.restore();
 
       requestAnimationFrame(this.render);
+    }
+
+    /** Rain is authored per scene. Interiors and the tunnel resolve to zero. */
+    rainStrength(art) {
+      if (!art) return 0;
+      if (art.weather !== "rain" && art.weather !== "drizzle") return 0;
+      return art.rain || 0;
+    }
+
+    /**
+     * Cover-fits the painting to the real viewport (not the 1600×900 vector
+     * space) so tall phone screens crop once instead of twice, anchored on the
+     * scene's authored focal point.
+     */
+    drawBackdrop(ctx, art, t) {
+      const image = this.ready(art);
+      if (!image) return false;
+
+      const [fx, fy] = art.focus || [0.5, 0.5];
+      const drift = this.calm ? 0 : 1;
+      const zoom = 1.03 + Math.sin(t * 0.052) * 0.008 * drift;
+      const scale = Math.max(this.width / image.naturalWidth, this.height / image.naturalHeight) * zoom;
+      const w = image.naturalWidth * scale;
+      const h = image.naturalHeight * scale;
+      const x = (this.width - w) * fx + Math.sin(t * 0.037) * 5 * drift;
+      const y = (this.height - h) * fy + Math.cos(t * 0.029) * 4 * drift;
+
+      const grade = art.grade;
+      if (grade && this.supportsFilter) {
+        ctx.filter =
+          grade === "dawn"
+            ? "saturate(1.08) brightness(1.14) sepia(0.16) hue-rotate(-10deg)"
+            : "sepia(0.44) saturate(0.6) brightness(0.9) contrast(0.96)";
+      }
+      ctx.drawImage(image, x, y, w, h);
+      ctx.filter = "none";
+
+      if (grade === "dawn") {
+        const sunrise = ctx.createRadialGradient(
+          this.width * 0.62,
+          this.height * 0.24,
+          10,
+          this.width * 0.62,
+          this.height * 0.24,
+          Math.max(this.width, this.height) * 0.72,
+        );
+        sunrise.addColorStop(0, "rgba(255, 190, 138, 0.3)");
+        sunrise.addColorStop(0.5, "rgba(255, 154, 112, 0.09)");
+        sunrise.addColorStop(1, "rgba(255, 150, 110, 0)");
+        ctx.globalCompositeOperation = "screen";
+        ctx.fillStyle = sunrise;
+        ctx.fillRect(0, 0, this.width, this.height);
+        ctx.globalCompositeOperation = "source-over";
+        if (!this.supportsFilter) {
+          ctx.fillStyle = "rgba(255, 186, 132, 0.1)";
+          ctx.fillRect(0, 0, this.width, this.height);
+        }
+      } else if (grade === "memory") {
+        const bloom = ctx.createRadialGradient(
+          this.width * 0.5,
+          this.height * 0.42,
+          10,
+          this.width * 0.5,
+          this.height * 0.42,
+          Math.max(this.width, this.height) * 0.66,
+        );
+        bloom.addColorStop(0, "rgba(255, 214, 168, 0.14)");
+        bloom.addColorStop(1, "rgba(46, 28, 22, 0)");
+        ctx.fillStyle = bloom;
+        ctx.fillRect(0, 0, this.width, this.height);
+        if (!this.supportsFilter) {
+          ctx.fillStyle = "rgba(118, 74, 52, 0.24)";
+          ctx.fillRect(0, 0, this.width, this.height);
+        }
+      }
+      return true;
+    }
+
+    /**
+     * Three depth layers of falling water, drawn in viewport pixels so streak
+     * length stays physically plausible on any screen. `front` selects the near
+     * pass, which is drawn after the character so she stands inside the weather.
+     *
+     * A scene with `rainBand` is roofed: the fall is clipped to the open well
+     * between the canopy soffit and the platform edge, and the near pass is
+     * skipped outright, because there is no water between a sheltered camera
+     * and the person standing two metres away.
+     */
+    drawRain(ctx, t, art, strength, front) {
+      const roof = art.rainBand;
+      if (roof && front) return;
+
+      const density = Math.min(1.15, Math.max(0.42, (this.width * this.height) / (1440 * 900)));
+      const slope = -0.17 + Math.sin(t * 0.061) * 0.05;
+      const calm = this.calm;
+
+      ctx.save();
+      if (roof) {
+        ctx.beginPath();
+        ctx.rect(0, this.height * roof[0], this.width, this.height * (roof[1] - roof[0]));
+        ctx.clip();
+      }
+
+      RAIN_LAYERS.forEach((layer, layerIndex) => {
+        if (Boolean(layer.front) !== front) return;
+        if (calm && layer.front) return;
+
+        const drops = this.rainDrops[layerIndex];
+        const active = Math.round(drops.length * density * strength * (calm ? 0.45 : 1));
+        const speedScale = calm ? 0.1 : 1;
+        const span = this.height + 240;
+
+        ctx.lineWidth = layer.width;
+        ctx.lineCap = "round";
+
+        // Two batched passes per drop group: a full-length tail plus a brighter
+        // head, which fakes the along-streak brightness ramp without building a
+        // gradient per drop. Three opacity groups keep the curtain from looking
+        // like a single flat screen of identical lines.
+        for (let group = 0; group < 3; group += 1) {
+          const dim = 0.5 + group * 0.25;
+          for (let pass = 0; pass < 2; pass += 1) {
+            ctx.strokeStyle = `rgba(206, 232, 240, ${
+              layer.alpha[1] * dim * strength * (pass ? 1 : 0.55)
+            })`;
+            ctx.beginPath();
+            let drawn = 0;
+            for (let i = group; i < active; i += 3) {
+              const drop = drops[i];
+              const len = drop.len * (pass ? 0.42 : 1);
+              const head =
+                (((drop.y * span + t * drop.speed * speedScale) % span) + span) % span - 150;
+              const base = drop.x * this.width + t * drop.speed * speedScale * slope * 0.5;
+              const x = ((base % this.width) + this.width) % this.width;
+              ctx.moveTo(x - slope * len, head - len);
+              ctx.lineTo(x, head);
+              drawn += 1;
+            }
+            if (drawn) ctx.stroke();
+          }
+        }
+      });
+
+      if (roof) this.drawMist(ctx, t, strength, roof);
+      ctx.restore();
+
+      if (front) this.drawMist(ctx, t, strength, null);
+    }
+
+    /**
+     * A breathing sheet of mist. Open scenes get it low, sitting between the mid
+     * and near layers; roofed scenes get it inside the open well only.
+     */
+    drawMist(ctx, t, strength, band) {
+      const top = band ? this.height * band[0] : this.height * 0.44;
+      const bottom = band ? this.height * band[1] : this.height;
+      const mist = ctx.createLinearGradient(0, top, 0, bottom);
+      const breath = 0.028 + Math.sin(t * 0.24) * (this.calm ? 0 : 0.012);
+      mist.addColorStop(0, "rgba(178, 210, 222, 0)");
+      mist.addColorStop(0.55, `rgba(178, 210, 222, ${breath * strength})`);
+      mist.addColorStop(1, "rgba(150, 186, 202, 0)");
+      ctx.fillStyle = mist;
+      ctx.fillRect(0, top, this.width, bottom - top);
+    }
+
+    /** Ripple rings where the fall meets standing water on the platform. */
+    drawWetGround(ctx, t, art, strength) {
+      if (this.calm) return;
+      const bandTop = this.height * 0.68;
+      const bandHeight = this.height - bandTop;
+      ctx.lineWidth = 1;
+      this.splashes.forEach((splash) => {
+        const phase = ((t + splash.offset) % splash.period) / splash.period;
+        if (phase > 0.72) return;
+        const grow = phase / 0.72;
+        const y = bandTop + bandHeight * splash.depth;
+        const rx = splash.size * (0.3 + grow * 1.5) * (0.55 + splash.depth * 0.75);
+        const alpha = (1 - grow) * 0.16 * strength * art.wet;
+        ctx.strokeStyle = `rgba(214, 238, 245, ${alpha})`;
+        ctx.beginPath();
+        ctx.ellipse(splash.x * this.width, y, rx, rx * 0.26, 0, 0, Math.PI * 2);
+        ctx.stroke();
+      });
+    }
+
+    /** Water beading on the lens: the frontmost, slowest layer of the storm. */
+    drawGlassBeads(ctx, t, strength) {
+      this.beads.forEach((bead) => {
+        const phase = ((t + bead.offset) % bead.period) / bead.period;
+        const slide = phase * phase;
+        const x = (bead.x + bead.drift * phase) * this.width;
+        const y = (((bead.y + slide * 0.9) * this.height) % this.height + this.height) % this.height;
+        const alpha = Math.sin(Math.min(1, phase * 1.6) * Math.PI) * 0.2 * strength;
+        if (alpha <= 0.002) return;
+
+        const trail = ctx.createLinearGradient(x, y - bead.r * 16, x, y);
+        trail.addColorStop(0, "rgba(216, 240, 248, 0)");
+        trail.addColorStop(1, `rgba(216, 240, 248, ${alpha * 0.32})`);
+        ctx.strokeStyle = trail;
+        ctx.lineWidth = bead.r * 0.72;
+        ctx.beginPath();
+        ctx.moveTo(x, y - bead.r * 16);
+        ctx.lineTo(x, y);
+        ctx.stroke();
+
+        const glint = ctx.createRadialGradient(x - bead.r * 0.3, y - bead.r * 0.4, 0, x, y, bead.r * 2);
+        glint.addColorStop(0, `rgba(238, 250, 255, ${alpha})`);
+        glint.addColorStop(1, "rgba(200, 232, 244, 0)");
+        ctx.fillStyle = glint;
+        ctx.beginPath();
+        ctx.ellipse(x, y, bead.r * 1.5, bead.r * 2, 0, 0, Math.PI * 2);
+        ctx.fill();
+      });
     }
 
     gradient(ctx, x0, y0, x1, y1, stops) {
@@ -1542,12 +1961,13 @@
       const centerX = (portraitLayout ? 800 : 1180) + sway;
       const topY = 78 + breathe;
 
-      const aura = ctx.createRadialGradient(centerX, 350, 50, centerX, 350, 420);
-      aura.addColorStop(0, "rgba(99, 218, 228, 0.16)");
-      aura.addColorStop(0.55, "rgba(44, 106, 132, 0.06)");
-      aura.addColorStop(1, "rgba(10, 27, 42, 0)");
+      const aura = ctx.createRadialGradient(centerX, 380, 60, centerX, 380, 430);
+      const warmScene = this.scene === "office" || this.scene === "memory" || this.scene === "dawn";
+      aura.addColorStop(0, warmScene ? "rgba(232, 181, 126, 0.13)" : "rgba(150, 196, 208, 0.11)");
+      aura.addColorStop(0.6, "rgba(30, 48, 62, 0.05)");
+      aura.addColorStop(1, "rgba(10, 20, 30, 0)");
       ctx.fillStyle = aura;
-      ctx.fillRect(720, 0, 880, 900);
+      ctx.fillRect(centerX - 440, 0, 880, 900);
 
       ctx.save();
       ctx.translate(centerX, topY);
@@ -1573,48 +1993,27 @@
         return;
       }
 
-      const sceneFilter =
-        this.scene === "memory"
-          ? "sepia(0.1) saturate(0.88) brightness(0.96)"
-          : this.scene === "dawn"
-            ? "saturate(0.9) brightness(1.06)"
-            : "saturate(0.82) brightness(0.9) contrast(1.05)";
-      ctx.filter = `drop-shadow(0 26px 28px rgba(0, 4, 10, 0.68)) ${sceneFilter}`;
+      // Grades her to the light of the room she is standing in.
+      const SPRITE_GRADE = {
+        memory: "sepia(0.28) saturate(0.72) brightness(0.94)",
+        dawn: "saturate(0.94) brightness(1.08) sepia(0.06)",
+        office: "saturate(0.8) brightness(0.94) sepia(0.14)",
+        tunnel: "saturate(0.58) brightness(0.68) contrast(1.08)",
+      };
+      const sceneFilter = SPRITE_GRADE[this.scene] || "saturate(0.78) brightness(0.88) contrast(1.04)";
+      ctx.filter = `drop-shadow(0 26px 30px rgba(0, 4, 10, 0.62)) ${sceneFilter}`;
       ctx.drawImage(sprite, -drawWidth / 2, 0, drawWidth, drawHeight);
       ctx.filter = "none";
-
-      const rim = ctx.createLinearGradient(-drawWidth / 2, 0, drawWidth / 2, 0);
-      rim.addColorStop(0, "rgba(101, 230, 239, 0.16)");
-      rim.addColorStop(0.45, "rgba(101, 230, 239, 0)");
-      rim.addColorStop(1, "rgba(255, 197, 141, 0.04)");
-      ctx.globalCompositeOperation = "source-atop";
-      ctx.fillStyle = rim;
-      ctx.fillRect(-drawWidth / 2, 0, drawWidth, drawHeight);
-      ctx.globalCompositeOperation = "source-over";
-
-      if (emotion === "cry") {
-        const tearLength = 29 + Math.sin(t * 2.2) * 4;
-        ctx.strokeStyle = "rgba(177, 242, 249, 0.88)";
-        ctx.lineWidth = 3;
-        ctx.lineCap = "round";
-        ctx.shadowColor = "rgba(101, 230, 239, 0.55)";
-        ctx.shadowBlur = 8;
-        ctx.beginPath();
-        ctx.moveTo(-45, 245);
-        ctx.quadraticCurveTo(-50, 257, -46, 245 + tearLength);
-        ctx.moveTo(38, 246);
-        ctx.quadraticCurveTo(43, 258, 40, 266 + tearLength * 0.45);
-        ctx.stroke();
-      }
 
       ctx.restore();
     }
 
     drawAtmosphere(ctx, t) {
+      const drift = this.calm ? 0 : 1;
       this.particles.forEach((particle, index) => {
-        const y = (particle.y + t * 16 * particle.speed) % 900;
-        const x = particle.x + Math.sin(t * 0.35 + index) * 9;
-        ctx.fillStyle = `rgba(169, 232, 238, ${0.025 + (index % 5) * 0.012})`;
+        const y = (particle.y + t * 16 * particle.speed * drift) % 900;
+        const x = particle.x + Math.sin(t * 0.35 + index) * 9 * drift;
+        ctx.fillStyle = `rgba(206, 226, 232, ${0.016 + (index % 5) * 0.008})`;
         ctx.beginPath();
         ctx.arc(x, y, particle.size, 0, Math.PI * 2);
         ctx.fill();
@@ -1624,6 +2023,25 @@
 
   const audio = new AudioEngine();
   const renderer = new SceneRenderer(elements.canvas);
+
+  /**
+   * Publishes the dialogue slab's real height so the choice stack can sit
+   * directly on top of it. Without this the options are pinned to a guessed
+   * offset and a three-line question slides underneath them.
+   */
+  function trackDialogueHeight() {
+    const publish = () => {
+      elements.app.style.setProperty("--dialogue-h", `${elements.dialogueBox.offsetHeight}px`);
+    };
+    publish();
+    if (typeof ResizeObserver === "function") {
+      new ResizeObserver(publish).observe(elements.dialogueBox);
+    } else {
+      window.addEventListener("resize", publish);
+    }
+  }
+
+  trackDialogueHeight();
 
   function validateStory() {
     const errors = [];
@@ -1778,7 +2196,7 @@
     elements.minigamePanel.setAttribute("aria-hidden", String(!minigameVisible));
 
     if (scheduleVisible) {
-      elements.schedulePhase.textContent = `MEMORY DATE ${String(node.schedule.day).padStart(2, "0")} / ${String(node.schedule.total).padStart(2, "0")}`;
+      elements.schedulePhase.textContent = `${node.schedule.total}일 중 ${node.schedule.day}일 차`;
       elements.scheduleTitle.textContent = node.schedule.title;
       elements.scheduleHint.textContent = node.schedule.hint;
       elements.scheduleDays.innerHTML = "";
@@ -1914,7 +2332,7 @@
       } else if (!allowed) {
         const lock = document.createElement("span");
         lock.className = "choice-lock";
-        lock.textContent = `LOCKED · ${resolve(choice.lockedText) || "조건 미달"}`;
+        lock.textContent = `잠김 · ${resolve(choice.lockedText) || "조건 미달"}`;
         button.appendChild(lock);
       }
 
@@ -2068,9 +2486,10 @@
 
   function updateCollectionCount() {
     const collection = readCollection();
-    elements.collectionCount.textContent = String(
-      collection.photos.length + collection.achievements.length,
-    );
+    const total = collection.photos.length + collection.achievements.length;
+    elements.collectionCount.textContent = String(total);
+    // An empty album is not news; the badge only appears once there is something in it.
+    elements.collectionCount.hidden = total === 0;
   }
 
   function renderCollection() {
@@ -2109,7 +2528,7 @@
       const subtitle = document.createElement("span");
       const title = document.createElement("strong");
       const description = document.createElement("p");
-      subtitle.textContent = unlocked ? photo.subtitle : "LOCKED MEMORY";
+      subtitle.textContent = unlocked ? photo.subtitle : "미해금";
       title.textContent = unlocked ? photo.title : "미발견 사진";
       description.textContent = unlocked ? photo.description : "데이트와 보너스 게임에서 해금됩니다.";
       copy.append(subtitle, title, description);
@@ -2391,7 +2810,7 @@
     elements.endingTitle.textContent = ending.title;
     elements.endingSubtitle.textContent = ending.subtitle;
     elements.endingBody.textContent = ending.body;
-    elements.endingCount.textContent = `ENDING ARCHIVE ${unlocked.size} / ${ENDING_ORDER.length}`;
+    elements.endingCount.textContent = `발견한 결말 ${unlocked.size} / ${ENDING_ORDER.length}`;
     updateEndingBadges();
     updateContinueButton();
 

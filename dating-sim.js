@@ -8,7 +8,7 @@
       code: "PLATFORM CAFE",
       name: "승강장 카페",
       description: "따뜻한 음료와 마주 앉는 대화",
-      reward: "SYNC +1",
+      reward: "동조 +1",
       bg: "platform",
       stat: "trust",
     },
@@ -16,7 +16,7 @@
       code: "PHOTO BOOTH",
       name: "증명사진 부스",
       description: "남기지 못한 두 사람의 사진",
-      reward: "MEMORY +1",
+      reward: "기억 +1",
       bg: "office",
       stat: "memory",
     },
@@ -24,7 +24,7 @@
       code: "MEMORY ROOFTOP",
       name: "기억의 옥상",
       description: "도시의 소리와 미완성된 약속",
-      reward: "RESOLVE +1",
+      reward: "결심 +1",
       bg: "memory",
       stat: "courage",
     },
@@ -495,11 +495,11 @@
 
   function apply(story, chapters, endings, line) {
     Object.assign(chapters, {
-      romance: { number: "CHAPTER 02", name: "다시 만나는 5일" },
-      two: { number: "CHAPTER 03", name: "보내지 못한 여름" },
-      three: { number: "CHAPTER 04", name: "사라진 1분" },
-      four: { number: "CHAPTER 05", name: "유실역의 규칙" },
-      five: { number: "FINAL CHAPTER", name: "오전 2시 18분" },
+      romance: { number: "2장", name: "다시 만나는 5일" },
+      two: { number: "3장", name: "보내지 못한 여름" },
+      three: { number: "4장", name: "사라진 1분" },
+      four: { number: "5장", name: "유실역의 규칙" },
+      five: { number: "마지막 장", name: "오전 2시 18분" },
     });
     story.c123.next = "dateIntro01";
 
@@ -613,7 +613,7 @@
         {
           mode: "message",
           phone: {
-            day: `DATE ${dayId} / ${String(TOTAL_DATES).padStart(2, "0")}`,
+            day: `${TOTAL_DATES}일 중 ${day.number}일 차`,
             time: day.message.time,
             contact: "한윤서",
             messages: day.message.incoming.map((text) => ({ from: "seo", text })),
@@ -636,7 +636,7 @@
         {
           mode: "message",
           phone: {
-            day: `DATE ${dayId} / ${String(TOTAL_DATES).padStart(2, "0")}`,
+            day: `${TOTAL_DATES}일 중 ${day.number}일 차`,
             time: day.message.time,
             contact: "한윤서",
             messages: (state) => {
