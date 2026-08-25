@@ -1109,19 +1109,47 @@ test("dating choices remain scroll-reachable at compact breakpoint edges", async
   }
 });
 
-test("the preferred-date hint stays visible near the portrait breakpoint", async ({ page }) => {
-  await page.setViewportSize({ width: 360, height: 671 });
-  await page.getByRole("button", { name: /처음부터/ }).click();
-  await expect(page.locator("#gameScreen")).toHaveClass(/is-active/);
-  await playRoute(page, PRE_DATE_ROUTE);
+test("the mobile schedule stays below its hint and inside the viewport", async ({ page }) => {
+  test.setTimeout(60_000);
 
-  const layout = await page.evaluate(() => {
-    const hint = document.querySelector("#scheduleHint").getBoundingClientRect();
-    const firstChoice = document.querySelector(".choice-button").getBoundingClientRect();
-    return { hintBottom: hint.bottom, firstChoiceTop: firstChoice.top };
-  });
+  for (const viewport of [
+    { width: 360, height: 671 },
+    { width: 375, height: 667 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.goto("/");
+    await page.getByRole("button", { name: /처음부터/ }).click();
+    await expect(page.locator("#gameScreen")).toHaveClass(/is-active/);
+    await playRoute(page, PRE_DATE_ROUTE);
 
-  expect(layout.firstChoiceTop).toBeGreaterThanOrEqual(layout.hintBottom + 8);
+    const layout = await page.evaluate(() => {
+      const hint = document.querySelector("#scheduleHint").getBoundingClientRect();
+      const firstChoice = document.querySelector(".choice-button").getBoundingClientRect();
+      const choices = document.querySelector("#choicePanel").getBoundingClientRect();
+      return {
+        hintBottom: hint.bottom,
+        firstChoiceTop: firstChoice.top,
+        choicesLeft: choices.left,
+        choicesRight: choices.right,
+        viewportWidth: window.innerWidth,
+      };
+    });
+
+    expect(layout.firstChoiceTop).toBeGreaterThanOrEqual(layout.hintBottom + 8);
+    expect(layout.choicesLeft).toBeGreaterThanOrEqual(0);
+    expect(layout.choicesRight).toBeLessThanOrEqual(layout.viewportWidth);
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const lastChoice = document
+            .querySelector(".choice-button:last-child")
+            .getBoundingClientRect();
+          const dialogue = document.querySelector(".dialogue-box").getBoundingClientRect();
+          return lastChoice.bottom - dialogue.top;
+        }),
+      )
+      .toBeLessThanOrEqual(-8);
+  }
 });
 
 test("compact phone messages can be scrolled without advancing", async ({ page }) => {

@@ -2371,7 +2371,7 @@ kbd {
   }
 
   .choice-panel.is-schedule {
-    top: 246px;
+    top: 272px;
     right: 10px;
     bottom: 220px;
     left: 10px;
@@ -2503,6 +2503,21 @@ kbd {
     display: none;
   }
 
+  .game-screen[data-mode="schedule"] .dialogue-box {
+    height: 144px;
+    min-height: 144px;
+  }
+
+  .game-screen[data-mode="schedule"] .dialogue-text {
+    max-height: 58px;
+    overflow-y: auto;
+  }
+
+  .choice-panel.is-schedule {
+    bottom: 172px;
+    align-content: start;
+  }
+
   .choice-panel:not(.is-schedule):not(.is-message) {
     top: 164px;
   }
@@ -2604,7 +2619,7 @@ kbd {
     bottom: 172px;
     align-content: start;
     overflow-y: auto;
-    transform: translateX(-50%);
+    transform: none;
   }
 
   .choice-panel.is-schedule .choice-button {
