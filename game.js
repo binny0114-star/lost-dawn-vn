@@ -2005,21 +2005,6 @@
       ctx.drawImage(sprite, -drawWidth / 2, 0, drawWidth, drawHeight);
       ctx.filter = "none";
 
-      if (emotion === "cry") {
-        const tearLength = 29 + Math.sin(t * 2.2) * 4;
-        ctx.strokeStyle = "rgba(177, 242, 249, 0.88)";
-        ctx.lineWidth = 3;
-        ctx.lineCap = "round";
-        ctx.shadowColor = "rgba(101, 230, 239, 0.55)";
-        ctx.shadowBlur = 8;
-        ctx.beginPath();
-        ctx.moveTo(-45, 245);
-        ctx.quadraticCurveTo(-50, 257, -46, 245 + tearLength);
-        ctx.moveTo(38, 246);
-        ctx.quadraticCurveTo(43, 258, 40, 266 + tearLength * 0.45);
-        ctx.stroke();
-      }
-
       ctx.restore();
     }
 
